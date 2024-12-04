@@ -1,0 +1,62 @@
+### Test environment variables
+@baseUrl = http://localhost:8000
+
+### Test simple path parameter
+GET {{baseUrl}}/items/42
+Accept: application/json
+
+### Test invalid simple path parameter (string instead of int)
+GET {{baseUrl}}/items/abc
+Accept: application/json
+
+### Test category path parameters - Electronics
+GET {{baseUrl}}/items/electronics/1
+Accept: application/json
+
+### Test invalid category
+GET {{baseUrl}}/items/food/1
+Accept: application/json
+
+### Test validated items - Valid range
+GET {{baseUrl}}/validated-items/1
+Accept: application/json
+
+### Test validated items - Middle of range
+GET {{baseUrl}}/validated-items/50
+Accept: application/json
+
+### Test validated items - Upper limit
+GET {{baseUrl}}/validated-items/100
+Accept: application/json
+
+### Test validated items - Below range
+GET {{baseUrl}}/validated-items/0
+Accept: application/json
+
+### Test validated items - Above range
+GET {{baseUrl}}/validated-items/101
+Accept: application/json
+
+### Test validated items - Negative number
+GET {{baseUrl}}/validated-items/-1
+Accept: application/json
+
+### Test item details - Basic level
+GET {{baseUrl}}/validated-items/1/details?detail_level=basic
+Accept: application/json
+
+### Test item details - Detailed level
+GET {{baseUrl}}/validated-items/50/details?detail_level=detailed
+Accept: application/json
+
+### Test item details - Invalid detail level
+GET {{baseUrl}}/validated-items/1/details?detail_level=invalid
+Accept: application/json
+
+### Test item details - Invalid ID with valid detail level
+GET {{baseUrl}}/validated-items/101/details?detail_level=basic
+Accept: application/json
+
+### Test item details - Missing detail level parameter
+GET {{baseUrl}}/validated-items/1/details
+Accept: application/json
