@@ -1,8 +1,6 @@
 from fastapi import FastAPI, Path, Query, HTTPException
 from enum import Enum
 from typing import Optional, List
-
-from fastapi.openapi.docs import get_swagger_ui_html
 from pydantic import BaseModel, Field
 from starlette.responses import HTMLResponse
 import os
@@ -120,9 +118,6 @@ async def get_videos_by_category(
     """
     # Filter videos based on the specified category
     filtered_videos = [video for video in videos.values() if video.category == category]
-    # Return the sliced list of videos based on skip and limit
-    # http://0.0.0.0:8000/categories/tech/videos
-    return filtered_videos[skip : skip + limit]
 
 
 @app.get("/users/{user_id}/videos/{video_id}/stats")
@@ -156,7 +151,6 @@ async def get_video_stats(
 async def create_video(video: Video):
     """
     Create a new video entry.
-
     :param video: The video data to create, adhering to the Video model.
     :return: A confirmation message with the newly created video ID.
     """
