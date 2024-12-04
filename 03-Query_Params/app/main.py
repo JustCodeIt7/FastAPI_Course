@@ -8,9 +8,8 @@ import os
 app = FastAPI(
     title="FastAPI Path, Query, and Predefined Parameters",
     description="Comprehensive demo for YouTube tutorial",
-    version="1.0.0"
+    version="1.0.0",
 )
-
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -25,4 +24,4 @@ if __name__ == "__main__":
     # Use this for debugging purposes only
     import uvicorn
 
-    uvicorn.run('main:app', host="0.0.0.0", port=8001, log_level="debug", reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, log_level="debug", reload=True)
