@@ -1,107 +1,95 @@
-from fastapi import FastAPI, Path, HTTPException
-from typing import Optional
+from fastapi import FastAPI, Path, Query, HTTPException
 from enum import Enum
-from pydantic import BaseModel
-
+from typing import Optional, List
+from pydantic import BaseModel, Field
+from starlette.responses import HTMLResponse
+import os
 app = FastAPI(
-    title="YouTube FastAPI Tutorial",
-    description="Learn about Path Parameters in FastAPI",
+    title="FastAPI Path, Query, and Predefined Parameters",
+    description="Comprehensive demo for YouTube tutorial",
     version="1.0.0"
 )
 
-# Enum for video categories
+# Enums for predefined values
 class VideoCategory(str, Enum):
     TECH = "tech"
     GAMING = "gaming"
     MUSIC = "music"
-    EDUCATION = "education"
 
-# Pydantic model for Video
+
+# Pydantic model for video data
 class Video(BaseModel):
-    title: str
-    description: str
+    id: int
+    title: str = Field(..., min_length=3, max_length=50)
+    description: Optional[str] = Field(None, max_length=200)
     category: VideoCategory
-    views: int
-    likes: int
+    views: int = Field(..., ge=0)
+    likes: int = Field(..., ge=0)
 
-# Sample video database
-videos_db = {
-    1: Video(
-        title="FastAPI Tutorial",
-        description="Learn FastAPI Path Parameters",
-        category=VideoCategory.TECH,
-        views=1000,
-        likes=100
-    )
+
+# Sample video data (in-memory database)
+videos = {
+    1: Video(id=1, title="FastAPI Tutorial", description="Learn FastAPI basics", category=VideoCategory.TECH, views=1500, likes=200),
+    2: Video(id=2, title="Python for Beginners", description="Introduction to Python", category=VideoCategory.TECH, views=1200, likes=150),
+    3: Video(id=3, title="Gaming Setup Tour", description="My gaming setup", category=VideoCategory.GAMING, views=800, likes=100),
+    4: Video(id=4, title="Guitar Lesson 1", description="Beginner guitar lesson", category=VideoCategory.MUSIC, views=2000, likes=300),
 }
 
-@app.get("/")
+
+@app.get("/", response_class=HTMLResponse)
 async def root():
-    return {"message": "Welcome to YouTube API Tutorial"}
+    # display index.html
+    print("Starting")
+    with open("index.html", "r") as f:
+        return HTMLResponse(content=f.read(), status_code=200)
 
+
+
+# Path parameter with validation
 @app.get("/videos/{video_id}")
-async def get_video(
-    video_id: int = Path(
-        ...,
-        title="Video ID",
-        description="The ID of the video you want to retrieve",
-        ge=1
-    )
-):
-    if video_id not in videos_db:
+async def get_video(video_id: int = Path(..., gt=0, description="ID of the video")):
+    if video_id not in videos:
         raise HTTPException(status_code=404, detail="Video not found")
-    return videos_db[video_id]
+    return videos[video_id]
 
+
+# Predefined path values and query parameters (removed sorting)
 @app.get("/categories/{category}/videos")
 async def get_videos_by_category(
     category: VideoCategory,
-    skip: int = 0,
-    limit: Optional[int] = 10
+    limit: int = Query(10, gt=0, le=100, description="Maximum number of videos to return"),
+    skip: int = Query(0, ge=0, description="Number of videos to skip")
 ):
-    videos = [
-        video for video in videos_db.values()
-        if video.category == category
-    ]
-    return videos[skip:skip + limit]
+    filtered_videos = [video for video in videos.values() if video.category == category]
+    return filtered_videos[skip : skip + limit]  # Corrected slicing
 
-@app.get("/videos/{video_id}/stats")
+
+# Multiple path parameters and query parameters
+@app.get("/users/{user_id}/videos/{video_id}/stats")
 async def get_video_stats(
-    video_id: int = Path(
-        ...,
-        title="Video ID",
-        description="The ID of the video to get statistics for",
-        ge=1
-    )
+    user_id: int = Path(..., gt=0, description="ID of the user"),
+    video_id: int = Path(..., gt=0, description="ID of the video"),
+    watched: bool = Query(False, description="Whether the video was watched")
 ):
-    if video_id not in videos_db:
+    if video_id not in videos:
         raise HTTPException(status_code=404, detail="Video not found")
-    video = videos_db[video_id]
-    return {
-        "views": video.views,
-        "likes": video.likes,
-        "engagement_rate": round((video.likes / video.views) * 100, 2) if video.views > 0 else 0
-    }
+    return {"user_id": user_id, "video_id": video_id, "watched": watched, "video_data": videos[video_id]}
 
-# Add a new video
-@app.post("/videos/{video_id}")
-async def create_video(
-    video_id: int = Path(
-        ...,
-        title="Video ID",
-        description="The ID for the new video",
-        ge=1
-    ),
-    video: Video = None
-):
-    if video_id in videos_db:
-        raise HTTPException(status_code=400, detail="Video ID already exists")
-    videos_db[video_id] = video
-    return video
+
+# Request body and path parameters
+@app.post("/videos/")
+async def create_video(video: Video):
+    next_id = max(videos.keys()) + 1
+    videos[next_id] = video
+    return {"message": "Video created successfully", "video_id": next_id}
+
 
 # Created/Modified files during execution:
 # main.py
-if __name__ == "__main__":
-    # Use this for debugging purposes only
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="debug")
+# Created/Modified files during execution:
+# main.py
+# if __name__ == "__main__":
+#     # Use this for debugging purposes only
+#     import uvicorn
+#
+#     uvicorn.run(app, host="0.0.0.0", port=8001, log_level="debug")
