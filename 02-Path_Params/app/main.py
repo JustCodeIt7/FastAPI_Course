@@ -68,19 +68,23 @@ videos = {
     ),
 }
 
+
 ########### Initialize Data ##############
-
-
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    """
-    Serve the index.html page.
-    This endpoint reads the `index.html` file from the server and returns its content as an HTML response.
-    """
-    print("Starting")  # Log message indicating the server is starting
     with open("index.html", "r") as f:
         # Read and return the contents of index.html as an HTML response
-        return HTMLResponse(content=f.read(), status_code=200)
+        return HTMLResponse(content=f.read(), status_code=200)  # http://0.0.0.0:8000/
+
+
+# display up to 10 videos
+@app.get("/videos/", response_model=List[Video])
+async def get_videos():
+    """
+    :return: A list of videos with a default limit of 10.
+    """
+    # http://0.0.0.0:8000/videos/
+    return list(videos.values())[:10]
 
 
 @app.get("/videos/{video_id}")
@@ -95,7 +99,7 @@ async def get_video(video_id: int = Path(..., gt=0, description="ID of the video
     if video_id not in videos:
         # Raise a 404 error if the video ID does not exist
         raise HTTPException(status_code=404, detail="Video not found")
-    return videos[video_id]
+    return videos[video_id]  # http://0.0.0.0:8000/videos/1
 
 
 @app.get("/categories/{category}/videos")
@@ -117,7 +121,8 @@ async def get_videos_by_category(
     # Filter videos based on the specified category
     filtered_videos = [video for video in videos.values() if video.category == category]
     # Return the sliced list of videos based on skip and limit
-    return filtered_videos[skip : skip + limit]  # Corrected slicing
+    # http://0.0.0.0:8000/categories/tech/videos
+    return filtered_videos[skip : skip + limit]
 
 
 @app.get("/users/{user_id}/videos/{video_id}/stats")
@@ -138,6 +143,7 @@ async def get_video_stats(
     if video_id not in videos:
         # Raise a 404 error if the video ID does not exist
         raise HTTPException(status_code=404, detail="Video not found")
+    # http://0.0.0.0:8000/users/1/videos/1/stats
     return {
         "user_id": user_id,
         "video_id": video_id,
@@ -158,6 +164,7 @@ async def create_video(video: Video):
     next_id = max(videos.keys()) + 1
     # Add the new video to the in-memory database
     videos[next_id] = video
+    # http://0.0.0.0:8000/videos/
     return {"message": "Video created successfully", "video_id": next_id}
 
 
