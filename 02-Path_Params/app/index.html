@@ -6,7 +6,7 @@
             font-family: Arial, sans-serif;
             margin: 40px;
             background-color: #333333;
-                        color: white;
+            color: white;
 
             /*color: gray;*/
         }
@@ -32,10 +32,26 @@
         a:hover {
             text-decoration: underline;
         }
+
+        .folder {
+            margin-left: 20px;
+        }
+
+        .file {
+            margin-left: 40px;
+        }
     </style>
 </head>
 <body>
-<h1>FastAPI Query Params</h1>
+<h1>FastAPI Path Params</h1>
+<!--Display folder structure app/main.py app/index.html app/__init__.py -->
+<h2>Folder Structure</h2>
+<div class="folder">
+    <strong>app/</strong>
+    <div class="file">__init__.py</div>
+    <div class="file">main.py</div>
+    <div class="file">index.html</div>
+</div>
 
 </body>
 </html>
