@@ -1,3 +1,4 @@
+# Query Parameters Tutorial
 from typing import Optional, List
 from fastapi import FastAPI, Query
 from enum import Enum
@@ -6,9 +7,7 @@ from starlette.responses import HTMLResponse
 
 app = FastAPI(title="Query Parameters Tutorial")
 
-# ===============================
 # Sample Database
-# ===============================
 sample_data = [
     {"id": 1, "name": "Laptop", "category": "electronics", "price": 999.99},
     {"id": 2, "name": "Headphones", "category": "electronics", "price": 99.99},
@@ -23,9 +22,6 @@ sample_data = [
 ]
 
 
-# ===============================
-# Enumerations
-# ===============================
 # Enum for sorting options to restrict sort_by parameter to specific fields.
 class SortBy(str, Enum):
     name = "name"
@@ -33,9 +29,7 @@ class SortBy(str, Enum):
     category = "category"
 
 
-# ===============================
 # Pydantic Models
-# ===============================
 # Defines the structure of the Item response model.
 class Item(BaseModel):
     id: int
@@ -44,12 +38,8 @@ class Item(BaseModel):
     price: float
 
 
-# ===============================
-# Root Endpoint
-# ===============================
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    # Display a simple HTML page to introduce the tutorial
     html_content = """
     <html>
         <head>
