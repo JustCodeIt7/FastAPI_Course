@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from starlette.responses import HTMLResponse
 
 app = FastAPI(title="Query Parameters Tutorial")
+# /path-param/?limit=10
 
 # Sample Database
 sample_data = [
@@ -29,8 +30,7 @@ class SortBy(str, Enum):
     category = "category"
 
 
-# Pydantic Models
-# Defines the structure of the Item response model.
+# Pydantic Models: Defines the structure of the Item response model.
 class Item(BaseModel):
     id: int
     name: str
@@ -38,6 +38,7 @@ class Item(BaseModel):
     price: float
 
 
+# Root Endpoint
 @app.get("/", response_class=HTMLResponse)
 async def root():
     html_content = """
@@ -90,6 +91,7 @@ async def search_items(q: Optional[str] = None):
     """
     if q:
         return [item for item in sample_data if q.lower() in item["name"].lower()]
+
     return sample_data
 
 
@@ -118,7 +120,6 @@ async def filter_items(
     filtered_items = [
         item for item in sample_data if min_price <= item["price"] <= max_price
     ]
-
     # If category is specified, further filter the items by category
     if category:
         filtered_items = [
@@ -126,7 +127,6 @@ async def filter_items(
             for item in filtered_items
             if item["category"].lower() == category.lower()
         ]
-
     return filtered_items
 
 
@@ -190,7 +190,6 @@ async def validate_items(
         filtered_items = [
             item for item in filtered_items if search.lower() in item["name"].lower()
         ]
-
     return {
         "page": page,
         "size": size,
@@ -201,14 +200,12 @@ async def validate_items(
 
 # Application Entry Point
 if __name__ == "__main__":
-    # Import uvicorn for running the app
     import uvicorn
 
-    # Run the FastAPI application with specified host and port
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
         log_level="debug",
-        reload=True,  # Enables auto-reload on code changes
+        reload=True,
     )
