@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, field_validator
 from typing import List, Optional
 from datetime import datetime
 import uvicorn
@@ -48,9 +48,8 @@ class User(BaseModel):
     age: int = Field(..., ge=0, le=120)
     address: Optional[Address] = None
 
-    # Example data for documentation
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "username": "john_doe",
                 "email": "john@example.com",
@@ -78,7 +77,7 @@ class Order(BaseModel):
     order_date: datetime = Field(default_factory=datetime.now)
 
     # Ensure the order has at least one item
-    @validator("items")
+    @field_validator("items")
     def validate_items(cls, v):
         if not v:
             raise ValueError("Order must contain at least one item")
@@ -86,7 +85,7 @@ class Order(BaseModel):
 
     # Example data for documentation
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": 1,
                 "items": ["item1", "item2"],
@@ -120,9 +119,8 @@ class UserResponse(UserBase):
     id: int
     is_active: bool = True
 
-    # Example data for documentation
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": 1,
                 "username": "john_doe",
