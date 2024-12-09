@@ -153,16 +153,8 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
     return {"message": "Post deleted successfully"}
 
 
-# Root endpoint
-@app.get("/", tags=["root"])
-def read_root():
-    """
-    Root endpoint that returns a welcome message.
-    """
-    return {"message": "Welcome to the Blog API", "docs": "/docs", "redoc": "/redoc"}
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+#
+# if __name__ == "__main__":
+#     import uvicorn
+#
+#     uvicorn.run("p06_app.main:p06_app", host="0.0.0.0", port=8000, reload=True)

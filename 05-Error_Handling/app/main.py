@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
-app = FastAPI(title="Simple Library API")
+p05_app = FastAPI(title="Simple Library API")
 
 
 # Pydantic Models
@@ -22,7 +22,7 @@ counter = 1
 
 
 # API Endpoints
-@app.post("/books/", response_model=Book, status_code=status.HTTP_201_CREATED)
+@p05_app.post("/books/", response_model=Book, status_code=status.HTTP_201_CREATED)
 async def create_book(book: Book):
     """Create a new book"""
     global counter
@@ -33,13 +33,13 @@ async def create_book(book: Book):
     return book
 
 
-@app.get("/books/", response_model=List[Book])
+@p05_app.get("/books/", response_model=List[Book])
 async def get_books(skip: int = 0, limit: int = 10):
     """Get all books with pagination"""
     return list(books_db.values())[skip : skip + limit]
 
 
-@app.get("/books/{book_id}", response_model=Book)
+@p05_app.get("/books/{book_id}", response_model=Book)
 async def get_book(book_id: int):
     """Get a specific book by ID"""
     if book_id not in books_db:
@@ -49,7 +49,7 @@ async def get_book(book_id: int):
     return books_db[book_id]
 
 
-@app.put("/books/{book_id}", response_model=Book)
+@p05_app.put("/books/{book_id}", response_model=Book)
 async def update_book(book_id: int, book: Book):
     """Update a book"""
     if book_id not in books_db:
@@ -62,7 +62,7 @@ async def update_book(book_id: int, book: Book):
     return book
 
 
-@app.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+@p05_app.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_book(book_id: int):
     """Delete a book"""
     if book_id not in books_db:
@@ -73,8 +73,16 @@ async def delete_book(book_id: int):
     return None
 
 
+# root route
+@p05_app.get("/")
+async def read_root():
+    return {"message": "Welcome to the Simple Library API"}
+
+
 if __name__ == "__main__":
     # Use this for debugging purposes only
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="debug", reload=True)
+    uvicorn.run(
+        "main:p05_app", host="0.0.0.0", port=8000, log_level="debug", reload=True
+    )
