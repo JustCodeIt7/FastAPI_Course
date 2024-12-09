@@ -165,3 +165,8 @@ cython_debug/
 *dev.py
 *dev/
 
+# ignore all python files ending in -dev. abd all directories ending in -dev
+*-dev.
+
+
+*dev.md
