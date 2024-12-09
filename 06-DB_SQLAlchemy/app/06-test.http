@@ -1,0 +1,148 @@
+http  
+### Test the root endpoint  
+GET http://localhost:8000/  
+Accept: application/json  
+
+### List all posts  
+GET http://localhost:8000/posts/  
+Accept: application/json  
+
+### List posts with pagination  
+GET http://localhost:8000/posts/?skip=0&limit=5  
+Accept: application/json  
+
+### List posts by status  
+GET http://localhost:8000/posts/?status=published  
+Accept: application/json  
+
+### Get a specific post  
+GET http://localhost:8000/posts/1  
+Accept: application/json  
+
+### Create a new post  
+POST http://localhost:8000/posts/  
+Content-Type: application/json  
+
+{  
+    "title": "Test Post Title",  
+    "content": "This is a test post content that needs to be at least fifty characters long to pass validation.",  
+    "author": "Test Author",  
+    "status": "draft"  
+}  
+
+### Create a post with invalid data (should fail)  
+POST http://localhost:8000/posts/  
+Content-Type: application/json  
+
+{  
+    "title": "Short",  
+    "content": "Too short",  
+    "author": "A",  
+    "status": "draft"  
+}  
+
+### Update a post  
+PATCH http://localhost:8000/posts/1  
+Content-Type: application/json  
+
+{  
+    "title": "Updated Post Title",  
+    "status": "published"  
+}  
+
+### Update a post with invalid status transition (should fail)  
+PATCH http://localhost:8000/posts/1  
+Content-Type: application/json  
+
+{  
+    "status": "draft"  
+}  
+
+### Delete a post  
+DELETE http://localhost:8000/posts/1  
+
+### Try to get a non-existent post (should fail)  
+GET http://localhost:8000/posts/999  
+Accept: application/json  
+
+### Create a post with duplicate title (should fail)  
+POST http://localhost:8000/posts/  
+Content-Type: application/json  
+
+{  
+    "title": "Test Post Title",  
+    "content": "This is another post with the same title which should fail due to unique constraint.",  
+    "author": "Test Author",  
+    "status": "draft"  
+}  
+
+### List posts with invalid status (should fail)  
+GET http://localhost:8000/posts/?status=invalid_status  
+Accept: application/json  
+
+### Create multiple posts in sequence  
+POST http://localhost:8000/posts/  
+Content-Type: application/json  
+
+{  
+    "title": "First Sequential Post",  
+    "content": "This is the content for the first sequential post. It needs to be at least fifty characters long.",  
+    "author": "Sequential Author",  
+    "status": "draft"  
+}  
+
+###  
+POST http://localhost:8000/posts/  
+Content-Type: application/json  
+
+{  
+    "title": "Second Sequential Post",  
+    "content": "This is the content for the second sequential post. It needs to be at least fifty characters long.",  
+    "author": "Sequential Author",  
+    "status": "published"  
+}  
+
+### Test post lifecycle  
+# 1. Create a draft post  
+POST http://localhost:8000/posts/  
+Content-Type: application/json  
+
+{  
+    "title": "Lifecycle Test Post",  
+    "content": "This is a test post to demonstrate the lifecycle of a post from draft to published to archived.",  
+    "author": "Lifecycle Tester",  
+    "status": "draft"  
+}  
+
+###  
+# 2. Update to published  
+PATCH http://localhost:8000/posts/1  
+Content-Type: application/json  
+
+{  
+    "status": "published"  
+}  
+
+###  
+# 3. Update to archived  
+PATCH http://localhost:8000/posts/1  
+Content-Type: application/json  
+
+{  
+    "status": "archived"  
+}  
+
+### Performance test - get multiple posts  
+GET http://localhost:8000/posts/?limit=50  
+Accept: application/json  
+
+### Test different content types  
+POST http://localhost:8000/posts/  
+Content-Type: application/json  
+
+{  
+    "title": "Post with Special Content",  
+    "content": "This post contains special characters: !@#$%^&*()_+ and emojis 😀 🚀 💻 and multiple\nline\nbreaks and    spaces",  
+    "author": "Special Content Creator",  
+    "status": "published"  
+}  

@@ -104,6 +104,12 @@ class Post(PostBase):
 p06_app = FastAPI(title="Blog API with SQLAlchemy and Error Handling")
 
 
+# root route
+@p06_app.get("/")
+async def read_root():
+    return {"message": "Welcome to the Blog API"}
+
+
 # Database Dependency
 def get_db():
     db = SessionLocal()

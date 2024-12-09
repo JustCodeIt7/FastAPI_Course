@@ -4,18 +4,34 @@ import random
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from main import BlogPost, Base
+import os
+from main import BlogPost, Base, PostStatus
 
 # Initialize Faker
 fake = Faker()
 
 # Database connection
 SQLALCHEMY_DATABASE_URL = "sqlite:///./blog.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Ensure tables exist
-Base.metadata.create_all(bind=engine)
+
+def recreate_database():
+    """Drop and recreate the database"""
+    try:
+        # Remove existing database file
+        if os.path.exists("./blog.db"):
+            os.remove("./blog.db")
+        print("Removed existing database.")
+    except Exception as e:
+        print(f"Error removing database: {str(e)}")
+
+    # Create new tables
+    Base.metadata.create_all(bind=engine)
+    print("Created new database with updated schema.")
+
 
 def generate_random_date(start_date, end_date):
     """Generate a random datetime between start_date and end_date"""
@@ -24,92 +40,114 @@ def generate_random_date(start_date, end_date):
     random_number_of_days = random.randrange(days_between_dates)
     return start_date + timedelta(days=random_number_of_days)
 
-def generate_blog_posts(num_posts: int = 100):
+
+def generate_random_author():
+    """Generate a random author name"""
+    return fake.name()
+
+
+def generate_random_status():
+    """Generate a random post status with weighted probabilities"""
+    statuses = [
+        (PostStatus.PUBLISHED, 0.7),
+        (PostStatus.DRAFT, 0.2),
+        (PostStatus.ARCHIVED, 0.1),
+    ]
+    return random.choices(
+        [status for status, _ in statuses], weights=[weight for _, weight in statuses]
+    )[0]
+
+
+def generate_blog_posts(num_posts: int = 10):
     """Generate specified number of random blog posts"""
     db = SessionLocal()
 
-    # Date range for posts (last 2 years)
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=730)  # 2 years ago
+    start_date = end_date - timedelta(days=730)
 
     try:
         print(f"Generating {num_posts} random blog posts...")
 
         for i in range(num_posts):
-            # Generate random post data
-            title = fake.catch_phrase()
+            created_at = generate_random_date(start_date, end_date)
+            updated_at = created_at + timedelta(days=random.randint(0, 30))
 
-            # Generate content with multiple paragraphs
+            base_title = fake.catch_phrase()
+            title = f"{base_title} #{random.randint(1000, 9999)}"
+
             paragraphs = [fake.paragraph() for _ in range(random.randint(3, 7))]
             content = "\n\n".join(paragraphs)
 
-            # Generate random date
-            created_at = generate_random_date(start_date, end_date)
-
-            # Create post
             post = BlogPost(
                 title=title,
                 content=content,
-                created_at=created_at
+                author=generate_random_author(),
+                status=generate_random_status(),
+                views=random.randint(0, 1000),
+                created_at=created_at,
+                updated_at=updated_at,
             )
 
             db.add(post)
 
-            # Print progress
             if (i + 1) % 10 == 0:
                 print(f"Generated {i + 1} posts...")
+                db.commit()
 
-                # Commit all posts to database
         db.commit()
         print("Successfully generated all blog posts!")
 
-        # Print some statistics
+        print("\nDatabase Statistics:")
         total_posts = db.query(BlogPost).count()
-        print(f"\nDatabase Statistics:")
-        print(f"Total posts in database: {total_posts}")
+        print(f"Total posts: {total_posts}")
 
-        # Sample post preview
+        status_counts = {}
+        for status in PostStatus:
+            count = db.query(BlogPost).filter(BlogPost.status == status).count()
+            status_counts[status.value] = count
+
+        print("\nPosts by status:")
+        for status, count in status_counts.items():
+            print(f"{status}: {count}")
+
         sample_post = db.query(BlogPost).first()
-        print("\nSample Post Preview:")
-        print(f"Title: {sample_post.title}")
-        print(f"Created: {sample_post.created_at}")
-        print(f"Content Preview: {sample_post.content[:200]}...")
+        if sample_post:
+            print("\nSample Post Preview:")
+            print(f"Title: {sample_post.title}")
+            print(f"Author: {sample_post.author}")
+            print(f"Status: {sample_post.status}")
+            print(f"Views: {sample_post.views}")
+            print(f"Created: {sample_post.created_at}")
+            print(f"Updated: {sample_post.updated_at}")
+            print(f"Content Preview: {sample_post.content[:200]}...")
 
     except Exception as e:
         print(f"Error generating posts: {str(e)}")
         db.rollback()
+        raise
     finally:
         db.close()
 
-def clear_database():
-    """Clear all existing posts from the database"""
-    db = SessionLocal()
-    try:
-        print("Clearing existing posts...")
-        db.query(BlogPost).delete()
-        db.commit()
-        print("Database cleared successfully!")
-    except Exception as e:
-        print(f"Error clearing database: {str(e)}")
-        db.rollback()
-    finally:
-        db.close()
 
 if __name__ == "__main__":
-    # Ask user if they want to clear existing data
-    should_clear = input("Do you want to clear existing posts? (y/n): ").lower()
-    if should_clear == 'y':
-        clear_database()
+    print("This script will recreate the database with the updated schema.")
+    should_proceed = input("Do you want to proceed? (y/n): ").lower()
+
+    if should_proceed == "y":
+        # Recreate database with new schema
+        recreate_database()
 
         # Get number of posts to generate
-    while True:
-        try:
-            num_posts = int(input("How many posts do you want to generate? "))
-            if num_posts > 0:
-                break
-            print("Please enter a positive number.")
-        except ValueError:
-            print("Please enter a valid number.")
+        while True:
+            try:
+                num_posts = int(input("How many posts do you want to generate? "))
+                if num_posts > 0:
+                    break
+                print("Please enter a positive number.")
+            except ValueError:
+                print("Please enter a valid number.")
 
-            # Generate posts
-    generate_blog_posts(num_posts)
+        # Generate posts
+        generate_blog_posts(num_posts)
+    else:
+        print("Operation cancelled.")
