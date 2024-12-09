@@ -149,11 +149,3 @@ async def value_error_exception_handler(request, exc):
   - [Real Python FastAPI Guide](https://realpython.com/fastapi-python-web-apis/)
   - [Pydantic Usage Examples](https://github.com/samuelcolvin/pydantic)
 
-## Call to Action
-
-### Engagement
-- **Like and Subscribe**: Encourage viewers to like the video and subscribe to the channel for more tutorials.
-- **Comments and Questions**: Invite viewers to leave comments with their thoughts, questions, or topics they’d like to see covered in future videos.
-- **Share the Video**: Ask viewers to share the tutorial with others who might find it helpful.
-
----
