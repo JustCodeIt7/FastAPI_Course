@@ -15,9 +15,8 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
 # SECTION 2: PYDANTIC MODELS - BASE MODELS
-
-
 # Address model to be reused in other models
 class Address(BaseModel):
     street: str
@@ -38,8 +37,6 @@ class Address(BaseModel):
 
 
 # SECTION 3: PYDANTIC MODELS - USER RELATED
-
-
 # User data model with validation constraints
 class User(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
@@ -66,8 +63,6 @@ class User(BaseModel):
 
 
 # SECTION 4: PYDANTIC MODELS - ORDER RELATED
-
-
 # Order model with a custom validator for items
 class Order(BaseModel):
     id: int
@@ -101,8 +96,6 @@ class Order(BaseModel):
 
 
 # SECTION 5: PYDANTIC MODELS - USER AUTH RELATED
-
-
 # Base user model for account management
 class UserBase(BaseModel):
     username: str
@@ -131,8 +124,6 @@ class UserResponse(UserBase):
 
 
 # SECTION 6: ERROR HANDLERS
-
-
 # Custom validation error handler
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
@@ -155,8 +146,6 @@ async def http_exception_handler(request, exc):
 
 
 # SECTION 7: API ENDPOINTS - BASIC
-
-
 # Root endpoint to confirm the API is up
 @app.get("/")
 async def root():
@@ -164,8 +153,6 @@ async def root():
 
 
 # SECTION 8: API ENDPOINTS - USER OPERATIONS
-
-
 # Endpoint to create a user with input validation
 @app.post("/users/", response_model=User)
 async def create_user(user: User):
@@ -201,16 +188,11 @@ async def get_users(skip: int = 0, limit: int = 10):
 
 
 # SECTION 9: API ENDPOINTS - ORDER OPERATIONS
-
-
 # Endpoint to create an order with validation
 @app.post("/orders/", response_model=Order)
 async def create_order(order: Order):
     return order
 
 
-# SECTION 10: MAIN EXECUTION
-
-# Launch the application
 if __name__ == "__main__":
     uvicorn.run("main-v2:app", host="0.0.0.0", port=8000, reload=True)
