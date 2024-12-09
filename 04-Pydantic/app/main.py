@@ -1,26 +1,34 @@
-from enum import Enum
-from typing import Optional, List
-from pydantic import BaseModel, Field
-from starlette.responses import HTMLResponse
-import os
+# app/main.py
+
+from fastapi import FastAPI
+import uvicorn
+from app.routers import users, orders  # Changed to absolute import
+from app.exceptions import (
+    handle_validation_exception,
+    handle_http_exception,
+)  # Changed to absolute import
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 app = FastAPI(
-    title="FastAPI Path, Query, and Predefined Parameters",
-    description="Comprehensive demo for YouTube tutorial",
+    title="FastAPI Tutorial",
+    description="A complete example of FastAPI with Pydantic",
     version="1.0.0",
 )
 
+# Include routers
+app.include_router(users.router)
+app.include_router(orders.router)
 
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    # display index.html
-    print("Starting")
-    with open("index.html", "r") as f:
-        return HTMLResponse(content=f.read(), status_code=200)
+# Register exception handlers
+app.add_exception_handler(RequestValidationError, handle_validation_exception)
+app.add_exception_handler(StarletteHTTPException, handle_http_exception)
+
+
+@app.get("/")
+async def get_root():
+    return {"message": "Hello FastAPI!"}
 
 
 if __name__ == "__main__":
-    # Use this for debugging purposes only
-    import uvicorn
-
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, log_level="debug", reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
