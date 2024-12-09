@@ -1,114 +1,200 @@
 # main.py
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional
-from datetime import date
-import re
+from fastapi import FastAPI, HTTPException, status, Response
+from pydantic import BaseModel, constr, validator
+from typing import Optional, List, Dict, Union
+from enum import Enum
+from datetime import datetime
 
-app = FastAPI(title="User Registration System")
+app = FastAPI(title="Library API - Response Handling Demo")
+
+
+# Enums for Status
+class BookStatus(str, Enum):
+    AVAILABLE = "available"
+    BORROWED = "borrowed"
+    MAINTENANCE = "maintenance"
+    LOST = "lost"
+
+
+# Custom Exception Classes
+class BookNotFoundException(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Book not found in the library",
+        )
+
+
+class BookNotAvailableException(HTTPException):
+    def __init__(self, status: BookStatus):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Book is currently {status}",
+        )
 
 
 # Pydantic Models
-class UserBase(BaseModel):
-    email: EmailStr
-    username: str
-    full_name: str
-    birth_date: date
-    phone_number: Optional[str] = None
-
-    # Custom validator for username
-    @field_validator("username")
-    def username_alphanumeric(cls, v):
-        if not v.isalnum():
-            raise ValueError("Username must be alphanumeric")
-        return v
-
-    # Custom validator for phone number
-    @field_validator("phone_number")
-    def phone_number_format(cls, v):
-        if v is None:
-            return v
-        pattern = re.compile(r"^\+?1?\d{9,15}$")
-        if not pattern.match(v):
-            raise ValueError("Invalid phone number format")
-        return v
+class BookBase(BaseModel):
+    title: constr(min_length=1, max_length=100)
+    author: constr(min_length=1, max_length=100)
+    isbn: constr()
 
 
-class UserCreate(UserBase):
-    password: str
-
-    # Custom validator for password strength
-    @field_validator("password")
-    def password_strength(cls, v):
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
-        if not any(char.isupper() for char in v):
-            raise ValueError("Password must contain an uppercase letter")
-        if not any(char.islower() for char in v):
-            raise ValueError("Password must contain a lowercase letter")
-        if not any(char.isdigit() for char in v):
-            raise ValueError("Password must contain a number")
-        return v
+class BookCreate(BookBase):
+    pass
 
 
-class UserResponse(UserBase):
+class Book(BookBase):
     id: int
+    status: BookStatus
+    last_updated: datetime
 
     class Config:
         orm_mode = True
 
 
+class ErrorResponse(BaseModel):
+    error: str
+    detail: str
+    timestamp: datetime
+
+
+class SuccessResponse(BaseModel):
+    message: str
+    data: Optional[Dict] = None
+    timestamp: datetime
+
+
 # Simulated database
-users_db = []
-user_id_counter = 1
+books_db: Dict[int, dict] = {}
+book_id_counter = 1
+
+
+# Helper Functions
+def create_error_response(error: str, detail: str) -> ErrorResponse:
+    return ErrorResponse(error=error, detail=detail, timestamp=datetime.now())
+
+
+def create_success_response(
+    message: str, data: Optional[Dict] = None
+) -> SuccessResponse:
+    return SuccessResponse(message=message, data=data, timestamp=datetime.now())
 
 
 # API Endpoints
-@app.post("/users/", response_model=UserResponse, status_code=201)
-async def create_user(user: UserCreate):
-    global user_id_counter
+@app.post(
+    "/books/",
+    response_model=SuccessResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {"description": "Book successfully created"},
+        400: {"model": ErrorResponse, "description": "Invalid book data"},
+    },
+)
+async def create_book(book: BookCreate):
+    global book_id_counter
 
-    # Check if email already exists
-    if any(u["email"] == user.email for u in users_db):
-        raise HTTPException(status_code=400, detail="Email already registered")
+    # Check if ISBN already exists
+    if any(b["isbn"] == book.isbn for b in books_db.values()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Book with this ISBN already exists",
+        )
 
-    # Check if username already exists
-    if any(u["username"] == user.username for u in users_db):
-        raise HTTPException(status_code=400, detail="Username already taken")
+    book_dict = book.dict()
+    book_dict.update(
+        {
+            "id": book_id_counter,
+            "status": BookStatus.AVAILABLE,
+            "last_updated": datetime.now(),
+        }
+    )
 
-    # Create user dictionary
-    user_dict = user.dict()
-    user_dict["id"] = user_id_counter
-    users_db.append(user_dict)
-    user_id_counter += 1
+    books_db[book_id_counter] = book_dict
+    book_id_counter += 1
 
-    # Remove password from response
-    del user_dict["password"]
-    return user_dict
-
-
-@app.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: int):
-    user = next((u for u in users_db if u["id"] == user_id), None)
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return create_success_response(message="Book successfully created", data=book_dict)
 
 
-# Example usage and testing
-@app.get("/")
-async def read_root():
-    return {
-        "message": "Welcome to User Registration System",
-        "endpoints": {
-            "create_user": "/users/ (POST)",
-            "get_user": "/users/{user_id} (GET)",
-        },
-    }
+@app.get(
+    "/books/{book_id}",
+    response_model=Union[Book, ErrorResponse],
+    responses={
+        200: {"model": Book, "description": "Book details retrieved successfully"},
+        404: {"model": ErrorResponse, "description": "Book not found"},
+    },
+)
+async def get_book(book_id: int):
+    if book_id not in books_db:
+        raise BookNotFoundException()
+    return books_db[book_id]
+
+
+@app.patch(
+    "/books/{book_id}/status",
+    response_model=SuccessResponse,
+    responses={
+        200: {"description": "Book status updated successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid status update"},
+        404: {"model": ErrorResponse, "description": "Book not found"},
+    },
+)
+async def update_book_status(book_id: int, status: BookStatus):
+    if book_id not in books_db:
+        raise BookNotFoundException()
+
+    books_db[book_id]["status"] = status
+    books_db[book_id]["last_updated"] = datetime.now()
+
+    return create_success_response(
+        message=f"Book status updated to {status}", data=books_db[book_id]
+    )
+
+
+@app.delete(
+    "/books/{book_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "Book successfully deleted"},
+        404: {"model": ErrorResponse, "description": "Book not found"},
+    },
+)
+async def delete_book(book_id: int):
+    if book_id not in books_db:
+        raise BookNotFoundException()
+
+    del books_db[book_id]
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get(
+    "/books/",
+    response_model=List[Book],
+    responses={
+        200: {"description": "List of all books"},
+        204: {"description": "No books found"},
+    },
+)
+async def list_books():
+    books = list(books_db.values())
+    if not books:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return books
+
+
+# Custom exception handler
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=create_error_response(
+            error=exc.__class__.__name__, detail=str(exc.detail)
+        ).dict(),
+    )
 
 
 if __name__ == "__main__":
     # Use this for debugging purposes only
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, log_level="debug", reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="debug", reload=True)
