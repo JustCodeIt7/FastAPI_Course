@@ -107,3 +107,9 @@ def test_delete_post(client):
     assert response.status_code == 204
     response = client.get("/posts/1")
     assert response.status_code == 404
+
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    
