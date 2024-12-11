@@ -171,3 +171,4 @@ cython_debug/
 
 *dev.md
 /06-DB_SQLAlchemy/app/blog.db
+!/04-Pydantic/README-dec.md

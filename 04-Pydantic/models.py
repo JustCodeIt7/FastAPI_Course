@@ -30,7 +30,7 @@ class Comment(BaseModel):
     # Nested model for comments
     author: User
     content: str
-    # Default value for created_at is the current time
+    # Default value for created_at is the current time. A unique timestamp is generated for each comment.
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -38,11 +38,12 @@ class Post(BaseModel):
     title: str
     content: str
     author: User
+    # Default value for published_at is the current time. A unique timestamp is generated for each post.
     published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Optional tags field
     tags: Optional[List[str]] = None
-    # List of comments (initialized as empty list) using default_factory
-    comments: List[Comment] = []
+    # List of comments (initialized as empty list) using default_factory. Unique comments are added to the list.
+    comments: List[Comment] = Field(default_factory=list)
 
     @field_validator("title")
     def title_not_empty(cls, v):
@@ -50,7 +51,6 @@ class Post(BaseModel):
             raise ValueError("Title cannot be empty")
         return v
 
-    # For demonstration, we might also add a custom validator
     # to ensure content length is reasonable.
     @field_validator("content")
     def content_length(cls, v):
@@ -59,7 +59,6 @@ class Post(BaseModel):
         return v
 
 
-# Example usage:
 if __name__ == "__main__":
     # Create a user
     author = User(
@@ -92,5 +91,3 @@ if __name__ == "__main__":
 
     # Print the serialized post
     print(post.model_dump_json(indent=2))
-
-    # Deserialize the post
