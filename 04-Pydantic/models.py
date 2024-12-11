@@ -1,16 +1,15 @@
 from datetime import datetime, timezone
-from pydantic import BaseModel, field_validator, EmailStr, Field
-from typing import List, Optional
-from typing import Union, List, Dict
-
-# pydantic is a data validation and parsing library for Python
-# It is used to define data schemas and validate input data.
+from pydantic import BaseModel, field_validator, EmailStr, Field, SecretStr
+from typing import List, Optional, Union
 
 
 # BaseModel is the base class for Pydantic models
 class User(BaseModel):
     username: str
     email: EmailStr
+    full_name: Optional[str] = None
+    middle_name: Union[str, None] = None
+    password: SecretStr
 
     # Example validator: ensure username length
     @field_validator("username")
@@ -21,25 +20,28 @@ class User(BaseModel):
 
     @field_validator("email")
     def email_length(cls, v):
+        # Ensure email is at least 3 characters long
         if len(v) < 3:
             raise ValueError("Email must be at least 3 characters long")
         return v
 
 
 class Comment(BaseModel):
+    # Nested model for comments
     author: User
     content: str
-    created_at: datetime = datetime.now(timezone.utc)
+    # Default value for created_at is the current time
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Post(BaseModel):
     title: str
     content: str
     author: User
-    published_at: datetime = datetime.now(timezone.utc)
+    published_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Optional tags field
     tags: Optional[List[str]] = None
-    # List of comments (initialized as empty list)
+    # List of comments (initialized as empty list) using default_factory
     comments: List[Comment] = []
 
     @field_validator("title")
@@ -60,7 +62,13 @@ class Post(BaseModel):
 # Example usage:
 if __name__ == "__main__":
     # Create a user
-    author = User(username="janedoe", email="jane@example.com")
+    author = User(
+        username="janedoe",
+        email="jane@example.com",
+        full_name="Jane Doe",
+        middle_name="Mary",
+        password=SecretStr("password123"),
+    )
 
     # Create a post
     post = Post(
@@ -71,10 +79,18 @@ if __name__ == "__main__":
     )
 
     # Add a comment
-    commenter = User(username="john123", email="john@domain.com")
+    commenter = User(
+        username="john123",
+        email="john@domain.com",
+        full_name="John Smith",
+        password=SecretStr("password123"),
+    )
     comment = Comment(author=commenter, content="Great post, looking forward to more!")
+    comment_2 = Comment(author=author, content="Another great post!")
     post.comments.append(comment)
+    post.comments.append(comment_2)
 
     # Print the serialized post
-    print(post.model_dump())  # Convert to dictionary
-    print(post.model_dump_json(indent=2))  # Pretty-print JSON
+    print(post.model_dump_json(indent=2))
+
+    # Deserialize the post
