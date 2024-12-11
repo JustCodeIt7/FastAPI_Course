@@ -1,115 +1,174 @@
-# test_main.py
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.main import p06_app, Base, get_db, BlogPost, PostStatus
+# main.py
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_blog.db"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from fastapi import FastAPI, HTTPException
 
-Base.metadata.create_all(bind=engine)
+from pydantic import BaseModel, EmailStr, field_validator
 
+from typing import Optional
 
-@pytest.fixture(scope="module")
-def client():
-    def override_get_db():
-        try:
-            db = TestingSessionLocal()
-            yield db
-        finally:
-            db.close()
+from datetime import date
 
-    p06_app.dependency_overrides[get_db] = override_get_db
-    with TestClient(p06_app) as c:
-        yield c
+import re
+
+p04_app = FastAPI(title="User Registration System")
+
+# Pydantic Models
 
 
-def create_test_post(
-    db,
-    title="Test Post",
-    content="Test Content",
-    author="Test Author",
-    status=PostStatus.DRAFT,
-):
-    post = BlogPost(title=title, content=content, author=author, status=status)
-    db.add(post)
-    db.commit()
-    db.refresh(post)
-    return post
+class UserBase(BaseModel):
+
+    email: EmailStr
+
+    username: str
+
+    full_name: str
+
+    birth_date: date
+
+    phone_number: Optional[str] = None
+
+    # Custom validator for username
+
+    @field_validator("username")
+    def username_alphanumeric(cls, v):
+
+        if not v.isalnum():
+
+            raise ValueError("Username must be alphanumeric")
+
+        return v
+
+    # Custom validator for phone number
+
+    @field_validator("phone_number")
+    def phone_number_format(cls, v):
+
+        if v is None:
+
+            return v
+
+        pattern = re.compile(r"^\+?1?\d{9,15}$")
+
+        if not pattern.match(v):
+
+            raise ValueError("Invalid phone number format")
+
+        return v
 
 
-def create_test_posts(db, count=10):
-    for i in range(count):
-        create_test_post(
-            db,
-            title=f"Test Post {i}",
-            content=f"Test Content {i}",
-            author=f"Author {i}",
-        )
+class UserCreate(UserBase):
+
+    password: str
+
+    # Custom validator for password strength
+
+    @field_validator("password")
+    def password_strength(cls, v):
+
+        if len(v) < 8:
+
+            raise ValueError("Password must be at least 8 characters")
+
+        if not any(char.isupper() for char in v):
+
+            raise ValueError("Password must contain an uppercase letter")
+
+        if not any(char.islower() for char in v):
+
+            raise ValueError("Password must contain a lowercase letter")
+
+        if not any(char.isdigit() for char in v):
+
+            raise ValueError("Password must contain a number")
+
+        return v
 
 
-def test_create_post(client):
-    response = client.post(
-        "/posts/",
-        json={"title": "New Post", "content": "New Content", "author": "New Author"},
-    )
-    assert response.status_code == 201
-    assert response.json()["title"] == "New Post"
+class UserResponse(UserBase):
+
+    id: int
+
+    class Config:
+
+        from_attributes = True
 
 
-def test_create_post_with_existing_title(client):
-    response = client.post(
-        "/posts/",
-        json={"title": "Test Post", "content": "New Content", "author": "New Author"},
-    )
-    assert response.status_code == 400
-    assert response.json()["detail"] == "A post with this title already exists"
+# Simulated database
+
+users_db = []
+
+user_id_counter = 1
+
+# API Endpoints
 
 
-def test_list_posts(client):
-    response = client.get("/posts/")
-    assert response.status_code == 200
-    assert len(response.json()) > 0
+@p04_app.post("/users/", response_model=UserResponse, status_code=201)
+async def create_user(user: UserCreate):
+
+    global user_id_counter
+
+    # Check if email already exists
+
+    if any(u["email"] == user.email for u in users_db):
+
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Check if username already exists
+
+    if any(u["username"] == user.username for u in users_db):
+
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    # Create user dictionary
+
+    user_dict = user.dict()
+
+    user_dict["id"] = user_id_counter
+
+    users_db.append(user_dict)
+
+    user_id_counter += 1
+
+    # Remove password from response
+
+    del user_dict["password"]
+
+    return user_dict
 
 
-def test_get_post(client):
-    response = client.get("/posts/1")
-    assert response.status_code == 200
-    assert response.json()["title"] == "Test Post"
+@p04_app.get("/users/{user_id}", response_model=UserResponse)
+async def get_user(user_id: int):
+
+    user = next((u for u in users_db if u["id"] == user_id), None)
+
+    if user is None:
+
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user
 
 
-def test_get_post_not_found(client):
-    response = client.get("/posts/999")
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Post not found"
+# Example usage and testing
 
 
-def test_update_post(client):
-    response = client.patch("/posts/1", json={"title": "Updated Post"})
-    assert response.status_code == 200
-    assert response.json()["title"] == "Updated Post"
+@p04_app.get("/")
+async def read_root():
 
-
-def test_update_post_invalid_status_transition(client):
-    response = client.patch("/posts/1", json={"status": "archived"})
-    assert response.status_code == 200
-    response = client.patch("/posts/1", json={"status": "published"})
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Cannot transition from archived to published"
-
-
-def test_delete_post(client):
-    response = client.delete("/posts/1")
-    assert response.status_code == 204
-    response = client.get("/posts/1")
-    assert response.status_code == 404
+    return {
+        "message": "Welcome to User Registration System",
+        "endpoints": {
+            "create_user": "/users/ (POST)",
+            "get_user": "/users/{user_id} (GET)",
+        },
+    }
 
 
 if __name__ == "__main__":
+
+    # Use this for debugging purposes only
+
     import uvicorn
-    
-    
+
+    uvicorn.run(
+        "main:p04_app", host="0.0.0.0", port=8000, log_level="debug", reload=True
+    )
