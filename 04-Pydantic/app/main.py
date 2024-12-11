@@ -1,166 +1,126 @@
-# main.py
+# app/main.py  
+from fastapi import FastAPI, HTTPException, Depends  
+from sqlalchemy import create_engine, Column, Integer, String, Enum  
+from sqlalchemy.ext.declarative import declarative_base  
+from sqlalchemy.orm import sessionmaker, Session  
+from pydantic import BaseModel  
+import enum  
+from typing import List, Optional  
+
+# Database setup  
+SQLALCHEMY_DATABASE_URL = "sqlite:///./blog.db"  
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})  
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)  
+Base = declarative_base()  
+
+# Enums  
+class PostStatus(str, enum.Enum):  
+    DRAFT = "draft"  
+    PUBLISHED = "published"  
+    ARCHIVED = "archived"  
+
+# Database Models  
+class BlogPost(Base):  
+    __tablename__ = "posts"  
+
+    id = Column(Integer, primary_key=True, index=True)  
+    title = Column(String, unique=True, index=True)  
+    content = Column(String)  
+    author = Column(String)  
+    status = Column(Enum(PostStatus), default=PostStatus.DRAFT)  
+
+# Pydantic Models  
+class PostBase(BaseModel):  
+    title: str  
+    content: str  
+    author: str  
+
+class PostCreate(PostBase):  
+    pass  
+
+class PostUpdate(BaseModel):  
+    title: Optional[str] = None  
+    content: Optional[str] = None  
+    author: Optional[str] = None  
+    status: Optional[PostStatus] = None  
+
+class Post(PostBase):  
+    id: int  
+    status: PostStatus  
+
+    class Config:  
+        orm_mode = True  
+
+# Create tables  
+Base.metadata.create_all(bind=engine)  
+
+# Dependency  
+def get_db():  
+    db = SessionLocal()  
+    try:  
+        yield db  
+    finally:  
+        db.close()  
+
+# FastAPI app  
+p06_app = FastAPI()  
+
+# Routes  
+@p06_app.post("/posts/", response_model=Post, status_code=201)  
+def create_post(post: PostCreate, db: Session = Depends(get_db)):  
+    db_post = db.query(BlogPost).filter(BlogPost.title == post.title).first()  
+    if db_post:  
+        raise HTTPException(status_code=400, detail="A post with this title already exists")  
+
+    db_post = BlogPost(**post.dict())  
+    db.add(db_post)  
+    db.commit()  
+    db.refresh(db_post)  
+    return db_post  
+
+@p06_app.get("/posts/", response_model=List[Post])  
+def list_posts(db: Session = Depends(get_db)):  
+    return db.query(BlogPost).all()  
+
+@p06_app.get("/posts/{post_id}", response_model=Post)  
+def get_post(post_id: int, db: Session = Depends(get_db)):  
+    post = db.query(BlogPost).filter(BlogPost.id == post_id).first()  
+    if post is None:  
+        raise HTTPException(status_code=404, detail="Post not found")  
+    return post  
+
+@p06_app.patch("/posts/{post_id}", response_model=Post)  
+def update_post(post_id: int, post_update: PostUpdate, db: Session = Depends(get_db)):  
+    db_post = db.query(BlogPost).filter(BlogPost.id == post_id).first()  
+    if db_post is None:  
+        raise HTTPException(status_code=404, detail="Post not found")  
+
+    # Check status transition  
+    if post_update.status and db_post.status == PostStatus.ARCHIVED:  
+        if post_update.status != PostStatus.ARCHIVED:  
+            raise HTTPException(  
+                status_code=400,  
+                detail="Cannot transition from archived to published"  
+            )  
+
+    update_data = post_update.dict(exclude_unset=True)  
+    for key, value in update_data.items():  
+        setattr(db_post, key, value)  
+
+    db.commit()  
+    db.refresh(db_post)  
+    return db_post  
+
+@p06_app.delete("/posts/{post_id}", status_code=204)  
+def delete_post(post_id: int, db: Session = Depends(get_db)):  
+    db_post = db.query(BlogPost).filter(BlogPost.id == post_id).first()  
+    if db_post is None:  
+        raise HTTPException(status_code=404, detail="Post not found")  
+
+    db.delete(db_post)  
+    db.commit()  
+    return None  
 
-from fastapi import FastAPI, HTTPException
-
-from pydantic import BaseModel, EmailStr, field_validator
-
-from typing import Optional
-
-from datetime import date
-
-import re
-
-p04_app = FastAPI(title="User Registration System")
-
-# Pydantic Models
-
-
-class UserBase(BaseModel):
-
-    email: EmailStr
-
-    username: str
-
-    full_name: str
-
-    birth_date: date
-
-    phone_number: Optional[str] = None
-
-    # Custom validator for username
-
-    @field_validator("username")
-    def username_alphanumeric(cls, v):
-
-        if not v.isalnum():
-
-            raise ValueError("Username must be alphanumeric")
-
-        return v
-
-    # Custom validator for phone number
-
-    @field_validator("phone_number")
-    def phone_number_format(cls, v):
-
-        if v is None:
-
-            return v
-
-        pattern = re.compile(r"^\+?1?\d{9,15}$")
-
-        if not pattern.match(v):
-
-            raise ValueError("Invalid phone number format")
-
-        return v
-
-
-class UserCreate(UserBase):
-
-    password: str
-
-    # Custom validator for password strength
-
-    @field_validator("password")
-    def password_strength(cls, v):
-
-        if len(v) < 8:
-
-            raise ValueError("Password must be at least 8 characters")
-
-        if not any(char.isupper() for char in v):
-
-            raise ValueError("Password must contain an uppercase letter")
-
-        if not any(char.islower() for char in v):
-
-            raise ValueError("Password must contain a lowercase letter")
-
-        if not any(char.isdigit() for char in v):
-
-            raise ValueError("Password must contain a number")
-
-        return v
-
-
-class UserResponse(UserBase):
-
-    id: int
-
-    class Config:
-
-        from_attributes = True
-
-
-# Simulated database
-
-users_db = []
-
-user_id_counter = 1
-
-# API Endpoints
-
-
-@p04_app.post("/users/", response_model=UserResponse, status_code=201)
-async def create_user(user: UserCreate):
-
-    global user_id_counter
-
-    # Check if email already exists
-
-    if any(u["email"] == user.email for u in users_db):
-
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    # Check if username already exists
-
-    if any(u["username"] == user.username for u in users_db):
-
-        raise HTTPException(status_code=400, detail="Username already taken")
-
-    # Create user dictionary
-
-    user_dict = user.dict()
-
-    user_dict["id"] = user_id_counter
-
-    users_db.append(user_dict)
-
-    user_id_counter += 1
-
-    # Remove password from response
-
-    del user_dict["password"]
-
-    return user_dict
-
-
-@p04_app.get("/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: int):
-
-    user = next((u for u in users_db if u["id"] == user_id), None)
-
-    if user is None:
-
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return user
-
-
-# Example usage and testing
-
-
-@p04_app.get("/")
-async def read_root():
-
-    return {
-        "message": "Welcome to User Registration System",
-        "endpoints": {
-            "create_user": "/users/ (POST)",
-            "get_user": "/users/{user_id} (GET)",
-        },
-    }
 
 
 if __name__ == "__main__":
@@ -170,5 +130,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "main:p04_app", host="0.0.0.0", port=8000, log_level="debug", reload=True
+        "main:p06_app", host="0.0.0.0", port=8000, log_level="debug", reload=True
     )
