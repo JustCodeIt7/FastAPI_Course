@@ -102,7 +102,6 @@ def update_post(post_id: int, post_update: PostUpdate, db: Session = Depends(get
                 status_code=400,  
                 detail="Cannot transition from archived to published"  
             )  
-
     update_data = post_update.dict(exclude_unset=True)  
     for key, value in update_data.items():  
         setattr(db_post, key, value)  
