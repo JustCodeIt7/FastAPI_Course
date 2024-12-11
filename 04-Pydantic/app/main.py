@@ -1,50 +1,15 @@
 # Import necessary libraries  
-# FastAPI for building the API  
-from fastapi import FastAPI, HTTPException, Depends  
-# SQLAlchemy for database operations  
-from sqlalchemy import create_engine, Column, Integer, String, Enum  
-from sqlalchemy.ext.declarative import declarative_base  
-from sqlalchemy.orm import sessionmaker, Session  
-# Pydantic for data validation  
-from pydantic import BaseModel  
-# Standard library imports  
+from fastapi import FastAPI, HTTPException  
+from pydantic import BaseModel, field_validator  
 import enum  
-from typing import List, Optional  
-
-# ==================== DATABASE SETUP ====================  
-# Configure SQLite database  
-# Using SQLite for simplicity - can be changed to PostgreSQL or MySQL  
-SQLALCHEMY_DATABASE_URL = "sqlite:///./blog.db"  
-engine = create_engine(  
-    SQLALCHEMY_DATABASE_URL,   
-    connect_args={"check_same_thread": False}  # SQLite specific argument  
-)  
-# Create database session  
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)  
-# Base class for SQLAlchemy models  
-Base = declarative_base()  
+from typing import List, Optional, Dict  
 
 # ==================== ENUMS ====================  
 # Define possible status values for blog posts  
 class PostStatus(str, enum.Enum):  
-    DRAFT = "draft"          
-    PUBLISHED = "published"  
-    ARCHIVED = "archived"    
-# ==================== DATABASE MODELS ====================  
-# SQLAlchemy model for database table  
-class BlogPost(Base):  
-    __tablename__ = "posts"  
-
-    # Primary key  
-    id = Column(Integer, primary_key=True, index=True)  
-    # Unique title field with index for faster queries  
-    title = Column(String, unique=True, index=True)  
-    # Post content  
-    content = Column(String)  
-    # Author of the post  
-    author = Column(String)  
-    # Post status with default value  
-    status = Column(Enum(PostStatus), default=PostStatus.DRAFT)  
+    DRAFT = "draft"          # Initial state  
+    PUBLISHED = "published"  # Visible to readers  
+    ARCHIVED = "archived"    # Removed from active posts  
 
 # ==================== PYDANTIC MODELS ====================  
 # Base model for common attributes  
@@ -55,7 +20,55 @@ class PostBase(BaseModel):
 
 # Model for creating new posts  
 class PostCreate(PostBase):  
-    pass  
+    @field_validator('title')
+    def validate_title(cls, title):  
+        # Check if title starts with capital letter  
+        if not title[0].isupper():  
+            raise ValueError("Title must start with a capital letter")  
+
+        # Check minimum length  
+        if len(title) < 5:  
+            raise ValueError("Title must be at least 5 characters long")  
+
+        # Check maximum length  
+        if len(title) > 100:  
+            raise ValueError("Title cannot be longer than 100 characters")  
+
+        # Check for special characters  
+        if not title.replace(" ", "").isalnum():  
+            raise ValueError("Title can only contain letters, numbers, and spaces")  
+
+        return title
+    
+    @field_validator('content')
+    def validate_content(cls, content):
+        # Check minimum length
+        if len(content) < 10:
+            raise ValueError("Content must be at least 10 characters long")
+
+        return content
+    
+    @field_validator('author')
+    def validate_author(cls, author):
+        # Check minimum length
+        if len(author) < 5:
+            raise ValueError("Author name must be at least 5 characters long")
+
+        # Check maximum length
+        if len(author) > 50:
+            raise ValueError("Author name cannot be longer than 50 characters")
+
+        return author
+    
+    status: PostStatus = PostStatus.DRAFT
+    
+    @field_validator('status')
+    def validate_status(cls, status):
+        # Check if status is a valid choice
+        if status not in PostStatus:
+            raise ValueError("Invalid status value")
+
+        return status   
 
 # Model for updating existing posts  
 class PostUpdate(BaseModel):  
@@ -65,107 +78,102 @@ class PostUpdate(BaseModel):
     author: Optional[str] = None  
     status: Optional[PostStatus] = None  
 
-# Complete post model including database fields  
+# Complete post model including ID and status  
 class Post(PostBase):  
     id: int  
     status: PostStatus  
 
-    class Config:  
-        # Enable ORM mode for Pydantic  
-        orm_mode = True  
-
-# Create database tables  
-Base.metadata.create_all(bind=engine)  
-
-# ==================== DATABASE DEPENDENCY ====================  
-# Dependency for database sessions  
-def get_db():  
-    db = SessionLocal()  
-    try:  
-        yield db  
-    finally:  
-        # Ensure database connection is closed  
-        db.close()  
+# ==================== IN-MEMORY DATABASE ====================  
+# Dictionary to store posts  
+posts_db: Dict[int, Post] = {}  
+# Counter for post IDs  
+post_id_counter = 1  
 
 # ==================== FASTAPI APP ====================  
-p06_app = FastAPI()  
+app = FastAPI(title="Blog API with Pydantic")  
 
 # ==================== API ROUTES ====================  
 # Create new post  
-@p06_app.post("/posts/", response_model=Post, status_code=201)  
-def create_post(post: PostCreate, db: Session = Depends(get_db)):  
+@app.post("/posts/", response_model=Post, status_code=201)  
+def create_post(post: PostCreate):  
+    global post_id_counter  
+
     # Check for duplicate titles  
-    db_post = db.query(BlogPost).filter(BlogPost.title == post.title).first()  
-    if db_post:  
-        raise HTTPException(status_code=400, detail="A post with this title already exists")  
+    if any(p.title == post.title for p in posts_db.values()):  
+        raise HTTPException(  
+            status_code=400,   
+            detail="A post with this title already exists"  
+        )  
 
     # Create new post  
-    db_post = BlogPost(**post.dict())  
-    db.add(db_post)  
-    db.commit()  
-    db.refresh(db_post)  
-    return db_post  
+    new_post = Post(  
+        id=post_id_counter,  
+        status=PostStatus.DRAFT,  
+        **post.dict()  
+    )  
+    posts_db[post_id_counter] = new_post  
+    post_id_counter += 1  
+
+    return new_post  
 
 # Get all posts  
-@p06_app.get("/posts/", response_model=List[Post])  
-def list_posts(db: Session = Depends(get_db)):  
-    return db.query(BlogPost).all()  
+@app.get("/posts/", response_model=List[Post])  
+def list_posts():  
+    return list(posts_db.values())  
 
 # Get single post by ID  
-@p06_app.get("/posts/{post_id}", response_model=Post)  
-def get_post(post_id: int, db: Session = Depends(get_db)):  
-    post = db.query(BlogPost).filter(BlogPost.id == post_id).first()  
-    if post is None:  
+@app.get("/posts/{post_id}", response_model=Post)  
+def get_post(post_id: int):  
+    if post_id not in posts_db:  
         raise HTTPException(status_code=404, detail="Post not found")  
-    return post  
+    return posts_db[post_id]  
 
 # Update existing post  
-@p06_app.patch("/posts/{post_id}", response_model=Post)  
-def update_post(post_id: int, post_update: PostUpdate, db: Session = Depends(get_db)):  
+@app.patch("/posts/{post_id}", response_model=Post)  
+def update_post(post_id: int, post_update: PostUpdate):  
     # Check if post exists  
-    db_post = db.query(BlogPost).filter(BlogPost.id == post_id).first()  
-    if db_post is None:  
+    if post_id not in posts_db:  
         raise HTTPException(status_code=404, detail="Post not found")  
 
+    post = posts_db[post_id]  
+
     # Validate status transitions  
-    # Cannot change status from archived to anything else  
-    if post_update.status and db_post.status == PostStatus.ARCHIVED:  
-        if post_update.status != PostStatus.ARCHIVED:  
-            raise HTTPException(  
-                status_code=400,  
-                detail="Cannot transition from archived to published"  
-            )  
+    if (post_update.status and   
+        post.status == PostStatus.ARCHIVED and   
+        post_update.status != PostStatus.ARCHIVED):  
+        raise HTTPException(  
+            status_code=400,  
+            detail="Cannot transition from archived to published"  
+        )  
 
     # Update post attributes  
     update_data = post_update.dict(exclude_unset=True)  
-    for key, value in update_data.items():  
-        setattr(db_post, key, value)  
+    updated_post = Post(  
+        **{  
+            **post.dict(),  
+            **update_data  
+        }  
+    )  
+    posts_db[post_id] = updated_post  
 
-    db.commit()  
-    db.refresh(db_post)  
-    return db_post  
+    return updated_post  
 
 # Delete post  
-@p06_app.delete("/posts/{post_id}", status_code=204)  
-def delete_post(post_id: int, db: Session = Depends(get_db)):  
-    # Check if post exists  
-    db_post = db.query(BlogPost).filter(BlogPost.id == post_id).first()  
-    if db_post is None:  
+@app.delete("/posts/{post_id}", status_code=204)  
+def delete_post(post_id: int):  
+    if post_id not in posts_db:  
         raise HTTPException(status_code=404, detail="Post not found")  
 
-    # Delete post  
-    db.delete(db_post)  
-    db.commit()  
+    del posts_db[post_id]  
     return None  
 
 # ==================== MAIN ====================  
 if __name__ == "__main__":  
-    # Run the application (development only)  
     import uvicorn  
     uvicorn.run(  
-        "main:p06_app",   
-        host="0.0.0.0",   
-        port=8000,   
-        log_level="debug",   
+        "main:app",  
+        host="0.0.0.0",  
+        port=8000,  
+        log_level="debug",  
         reload=True  
     )  
