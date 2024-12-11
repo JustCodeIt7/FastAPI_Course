@@ -1,6 +1,9 @@
-from datetime import datetime, timezone
+# %%
 from pydantic import BaseModel, field_validator, EmailStr, Field, SecretStr
 from typing import List, Optional, Union
+from datetime import datetime, timezone
+
+# %%
 
 
 # BaseModel is the base class for Pydantic models
@@ -26,6 +29,7 @@ class User(BaseModel):
         return v
 
 
+# %%
 class Comment(BaseModel):
     # Nested model for comments
     author: User
@@ -34,6 +38,7 @@ class Comment(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+# %%
 class Post(BaseModel):
     title: str
     content: str
@@ -59,35 +64,42 @@ class Post(BaseModel):
         return v
 
 
-if __name__ == "__main__":
-    # Create a user
-    author = User(
-        username="janedoe",
-        email="jane@example.com",
-        full_name="Jane Doe",
-        middle_name="Mary",
-        password=SecretStr("password123"),
-    )
+# %%
 
-    # Create a post
-    post = Post(
-        title="My First Blog Post",
-        content="Hello, world! Welcome to my new blog.",
-        author=author,
-        tags=["introduction", "personal"],
-    )
+# if __name__ == "__main__":
+# Create a user
+author = User(
+    username="janedoe",
+    email="jane@example.com",
+    full_name="Jane Doe",
+    middle_name="Mary",
+    password=SecretStr("password123"),
+)
 
-    # Add a comment
-    commenter = User(
-        username="john123",
-        email="john@domain.com",
-        full_name="John Smith",
-        password=SecretStr("password123"),
-    )
-    comment = Comment(author=commenter, content="Great post, looking forward to more!")
-    comment_2 = Comment(author=author, content="Another great post!")
-    post.comments.append(comment)
-    post.comments.append(comment_2)
+# %%
+# Create a post
+post = Post(
+    title="My First Blog Post",
+    content="Hello, world! Welcome to my new blog.",
+    author=author,
+    tags=["introduction", "personal"],
+)
 
-    # Print the serialized post
-    print(post.model_dump_json(indent=2))
+# %%
+# Add a comment
+commenter = User(
+    username="john123",
+    email="john@domain.com",
+    full_name="John Smith",
+    password=SecretStr("password123"),
+)
+comment = Comment(author=commenter, content="Great post, looking forward to more!")
+comment_2 = Comment(author=author, content="Another great post!")
+post.comments.append(comment)
+post.comments.append(comment_2)
+
+# %%
+# Print the serialized post
+print(post.model_dump_json(indent=2))
+
+# %%
