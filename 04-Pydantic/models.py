@@ -3,9 +3,8 @@ from pydantic import BaseModel, field_validator, EmailStr, Field, SecretStr
 from typing import List, Optional, Union
 from datetime import datetime, timezone
 
+
 # %%
-
-
 # BaseModel is the base class for Pydantic models
 class User(BaseModel):
     username: str
@@ -65,7 +64,6 @@ class Post(BaseModel):
 
 
 # %%
-
 # if __name__ == "__main__":
 # Create a user
 author = User(
@@ -85,6 +83,7 @@ post = Post(
     tags=["introduction", "personal"],
 )
 
+
 # %%
 # Add a comment
 commenter = User(
@@ -97,6 +96,7 @@ comment = Comment(author=commenter, content="Great post, looking forward to more
 comment_2 = Comment(author=author, content="Another great post!")
 post.comments.append(comment)
 post.comments.append(comment_2)
+
 
 # %%
 # Print the serialized post
