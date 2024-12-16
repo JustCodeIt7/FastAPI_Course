@@ -49,8 +49,6 @@ class CommentBase(BaseModel):
 
 # %%
 ############## Request Models (for input validation) ######
-
-
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
@@ -73,8 +71,6 @@ class CommentCreate(BaseModel):
 
 # %%
 ############ Response models with relationships ############
-
-
 class Comment(CommentBase):
     author: UserBase
 
@@ -86,8 +82,6 @@ class Post(PostBase):
 
 
 # %%
-
-
 class User(UserBase):
     posts: List[Post] = []
     comments: List[Comment] = []

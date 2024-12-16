@@ -1,3 +1,4 @@
+# main.py
 from datetime import datetime
 from uuid import uuid4
 from typing import List
@@ -31,8 +32,6 @@ def get_comment_by_id(comment_id):
 ########################################
 # Users
 ########################################
-
-
 @app.post("/users", response_model=User)
 def create_user(user_data: UserCreate):
     # In a real scenario:
@@ -74,8 +73,6 @@ def get_user(user_id: str):
 ########################################
 # Posts
 ########################################
-
-
 @app.post("/posts", response_model=Post)
 def create_post(post_data: PostCreate, author_id: str):
     # Check if author exists
@@ -121,8 +118,6 @@ def list_posts():
 ########################################
 # Comments
 ########################################
-
-
 @app.post("/posts/{post_id}/comments", response_model=Comment)
 def create_comment(post_id: str, comment_data: CommentCreate, author_id: str):
     # Check if post exists
