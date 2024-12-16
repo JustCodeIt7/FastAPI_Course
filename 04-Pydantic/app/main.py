@@ -1,179 +1,132 @@
-# Import necessary libraries  
-from fastapi import FastAPI, HTTPException  
-from pydantic import BaseModel, field_validator  
-import enum  
-from typing import List, Optional, Dict  
+# main.py
+from fastapi import FastAPI, HTTPException, Depends, status
+from typing import List
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
+from models import UserCreate, UserBase, User, PostCreate, Post, CommentCreate, Comment
 
-# ==================== ENUMS ====================  
-# Define possible status values for blog posts  
-class PostStatus(str, enum.Enum):  
-    DRAFT = "draft"          # Initial state  
-    PUBLISHED = "published"  # Visible to readers  
-    ARCHIVED = "archived"    # Removed from active posts  
+app = FastAPI(title="Blog API")
 
-# ==================== PYDANTIC MODELS ====================  
-# Base model for common attributes  
-class PostBase(BaseModel):  
-    title: str  
-    content: str  
-    author: str  
+# In-memory database (for demonstration)
+db = {"users": {}, "posts": {}, "comments": {}}
 
-# Model for creating new posts  
-class PostCreate(PostBase):  
-    @field_validator('title')
-    def validate_title(cls, title):  
-        # Check if title starts with capital letter  
-        if not title[0].isupper():  
-            raise ValueError("Title must start with a capital letter")  
 
-        # Check minimum length  
-        if len(title) < 5:  
-            raise ValueError("Title must be at least 5 characters long")  
+# Dependency to get current user (simplified auth)
+async def get_current_user(user_id: UUID) -> UserBase:
+    user = db["users"].get(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
 
-        # Check maximum length  
-        if len(title) > 100:  
-            raise ValueError("Title cannot be longer than 100 characters")  
 
-        # Check for special characters  
-        if not title.replace(" ", "").isalnum():  
-            raise ValueError("Title can only contain letters, numbers, and spaces")  
+# User endpoints
+@app.post("/users/", response_model=UserBase, status_code=status.HTTP_201_CREATED)
+async def create_user(user: UserCreate):
+    user_id = uuid4()
+    current_time = datetime.now(timezone.utc)
 
-        return title
-    
-    @field_validator('content')
-    def validate_content(cls, content):
-        # Check minimum length
-        if len(content) < 10:
-            raise ValueError("Content must be at least 10 characters long")
+    new_user = {
+        "id": user_id,
+        "username": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "bio": user.bio,
+        "created_at": current_time,
+        "updated_at": None,
+        "is_active": True,
+        "posts": [],
+        "comments": [],
+    }
 
-        return content
-    
-    @field_validator('author')
-    def validate_author(cls, author):
-        # Check minimum length
-        if len(author) < 5:
-            raise ValueError("Author name must be at least 5 characters long")
+    db["users"][user_id] = new_user
+    return new_user
 
-        # Check maximum length
-        if len(author) > 50:
-            raise ValueError("Author name cannot be longer than 50 characters")
 
-        return author
-    
-    status: PostStatus = PostStatus.DRAFT
-    
-    @field_validator('status')
-    def validate_status(cls, status):
-        # Check if status is a valid choice
-        if status not in PostStatus:
-            raise ValueError("Invalid status value")
+@app.get("/users/", response_model=List[UserBase])
+async def get_users():
+    return list(db["users"].values())
 
-        return status   
 
-# Model for updating existing posts  
-class PostUpdate(BaseModel):  
-    # All fields optional for partial updates  
-    title: Optional[str] = None  
-    content: Optional[str] = None  
-    author: Optional[str] = None  
-    status: Optional[PostStatus] = None  
+@app.get("/users/{user_id}", response_model=User)
+async def get_user(user_id: UUID):
+    if user_id not in db["users"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return db["users"][user_id]
 
-# Complete post model including ID and status  
-class Post(PostBase):  
-    id: int  
-    status: PostStatus  
 
-# ==================== IN-MEMORY DATABASE ====================  
-# Dictionary to store posts  
-posts_db: Dict[int, Post] = {}  
-# Counter for post IDs  
-post_id_counter = 1  
+# Post endpoints
+@app.post("/users/{user_id}/posts/", response_model=Post)
+async def create_post(
+    user_id: UUID, post: PostCreate, current_user: UserBase = Depends(get_current_user)
+):
+    post_id = uuid4()
+    current_time = datetime.now(timezone.utc)
 
-# ==================== FASTAPI APP ====================  
-app = FastAPI(title="Blog API with Pydantic")  
+    new_post = {
+        "id": post_id,
+        "title": post.title,
+        "content": post.content,
+        "created_at": current_time,
+        "updated_at": None,
+        "published": post.published,
+        "author_id": user_id,
+        "author": db["users"][user_id],
+        "comments": [],
+    }
 
-# ==================== API ROUTES ====================  
-# Create new post  
-@app.post("/posts/", response_model=Post, status_code=201)  
-def create_post(post: PostCreate):  
-    global post_id_counter  
+    db["posts"][post_id] = new_post
+    db["users"][user_id]["posts"].append(new_post)
+    return new_post
 
-    # Check for duplicate titles  
-    if any(p.title == post.title for p in posts_db.values()):  
-        raise HTTPException(  
-            status_code=400,   
-            detail="A post with this title already exists"  
-        )  
 
-    # Create new post  
-    new_post = Post(  
-        id=post_id_counter,  
-        status=PostStatus.DRAFT,  
-        **post.dict()  
-    )  
-    posts_db[post_id_counter] = new_post  
-    post_id_counter += 1  
+@app.get("/posts/", response_model=List[Post])
+async def get_posts():
+    return list(db["posts"].values())
 
-    return new_post  
 
-# Get all posts  
-@app.get("/posts/", response_model=List[Post])  
-def list_posts():  
-    return list(posts_db.values())  
+@app.get("/posts/{post_id}", response_model=Post)
+async def get_post(post_id: UUID):
+    if post_id not in db["posts"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    return db["posts"][post_id]
 
-# Get single post by ID  
-@app.get("/posts/{post_id}", response_model=Post)  
-def get_post(post_id: int):  
-    if post_id not in posts_db:  
-        raise HTTPException(status_code=404, detail="Post not found")  
-    return posts_db[post_id]  
 
-# Update existing post  
-@app.patch("/posts/{post_id}", response_model=Post)  
-def update_post(post_id: int, post_update: PostUpdate):  
-    # Check if post exists  
-    if post_id not in posts_db:  
-        raise HTTPException(status_code=404, detail="Post not found")  
+# Comment endpoints
+@app.post("/posts/{post_id}/comments/", response_model=Comment)
+async def create_comment(
+    post_id: UUID, comment: CommentCreate, current_user: UserBase = Depends(get_current_user)
+):
+    if post_id not in db["posts"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
-    post = posts_db[post_id]  
+    comment_id = uuid4()
+    current_time = datetime.now(timezone.utc)
 
-    # Validate status transitions  
-    if (post_update.status and   
-        post.status == PostStatus.ARCHIVED and   
-        post_update.status != PostStatus.ARCHIVED):  
-        raise HTTPException(  
-            status_code=400,  
-            detail="Cannot transition from archived to published"  
-        )  
+    new_comment = {
+        "id": comment_id,
+        "content": comment.content,
+        "created_at": current_time,
+        "updated_at": None,
+        "author_id": current_user["id"],
+        "post_id": post_id,
+        "author": current_user,
+    }
 
-    # Update post attributes  
-    update_data = post_update.dict(exclude_unset=True)  
-    updated_post = Post(  
-        **{  
-            **post.dict(),  
-            **update_data  
-        }  
-    )  
-    posts_db[post_id] = updated_post  
+    db["comments"][comment_id] = new_comment
+    db["posts"][post_id]["comments"].append(new_comment)
+    db["users"][current_user["id"]]["comments"].append(new_comment)
+    return new_comment
 
-    return updated_post  
 
-# Delete post  
-@app.delete("/posts/{post_id}", status_code=204)  
-def delete_post(post_id: int):  
-    if post_id not in posts_db:  
-        raise HTTPException(status_code=404, detail="Post not found")  
+@app.get("/posts/{post_id}/comments/", response_model=List[Comment])
+async def get_post_comments(post_id: UUID):
+    if post_id not in db["posts"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    return db["posts"][post_id]["comments"]
 
-    del posts_db[post_id]  
-    return None  
 
-# ==================== MAIN ====================  
-if __name__ == "__main__":  
-    import uvicorn  
-    uvicorn.run(  
-        "main:app",  
-        host="0.0.0.0",  
-        port=8000,  
-        log_level="debug",  
-        reload=True  
-    )  
+# ==================== MAIN ====================
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="debug", reload=True)
