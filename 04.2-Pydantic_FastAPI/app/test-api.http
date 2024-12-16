@@ -12,7 +12,8 @@ Content-Type: application/json
     "password": "test123"
 }
 
-POST http://0.0.0.0:8000/users/ 
+###
+POST http://0.0.0.0:8000/users/
 Content-Type: application/json
 
 {
