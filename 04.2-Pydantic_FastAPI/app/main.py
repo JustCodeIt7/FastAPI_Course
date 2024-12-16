@@ -1,166 +1,140 @@
 # main.py
-from datetime import datetime
-from uuid import uuid4
+from fastapi import FastAPI, HTTPException, Depends, status
 from typing import List
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
+from models import UserCreate, UserBase, User, PostCreate, Post, CommentCreate, Comment
 
-from fastapi import FastAPI, HTTPException, Depends
-from models import UserCreate, User, PostCreate, Post, CommentCreate, Comment
+app = FastAPI(title="Blog API")
 
-app = FastAPI()
-
-# In-memory "database" for demonstration
-fake_users_db = {}
-fake_posts_db = {}
-fake_comments_db = {}
+# In-memory database (for demonstration)
+db = {"users": {}, "posts": {}, "comments": {}}
 
 
-########################################
-# Utility Functions (Mimicking a DB)
-########################################
-def get_user_by_id(user_id):
-    return fake_users_db.get(str(user_id))
+# Dependency to get current user (simplified auth)
+async def get_current_user(user_id: UUID) -> UserBase:
+    user = db["users"].get(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
 
 
-def get_post_by_id(post_id):
-    return fake_posts_db.get(str(post_id))
+# User endpoints
+@app.post("/users/", response_model=UserBase, status_code=status.HTTP_201_CREATED)
+async def create_user(user: UserCreate):
+    user_id = uuid4()
+    current_time = datetime.now(timezone.utc)
 
-
-def get_comment_by_id(comment_id):
-    return fake_comments_db.get(str(comment_id))
-
-
-########################################
-# Users
-########################################
-@app.post("/users", response_model=User)
-def create_user(user_data: UserCreate):
-    # In a real scenario:
-    # 1. Hash the password
-    # 2. Save the user to the database
-
-    new_id = uuid4()
-    now = datetime.utcnow()
-    user_dict = {
-        "id": new_id,
-        "username": user_data.username,
-        "email": user_data.email,
-        "full_name": user_data.full_name,
-        "bio": user_data.bio,
-        "created_at": now,
+    new_user = {
+        "id": user_id,
+        "username": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "bio": user.bio,
+        "created_at": current_time,
         "updated_at": None,
         "is_active": True,
         "posts": [],
         "comments": [],
     }
-    fake_users_db[str(new_id)] = user_dict
-    return user_dict
+
+    db["users"][user_id] = new_user
+    return new_user
 
 
-# get users
-@app.get("/users", response_model=List[User])
-def list_users():
-    return list(fake_users_db.values())
+################ Users Endpoints ################
+@app.get("/users/", response_model=List[UserBase])
+async def get_users():
+    return list(db["users"].values())
 
 
 @app.get("/users/{user_id}", response_model=User)
-def get_user(user_id: str):
-    user = get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+async def get_user(user_id: UUID):
+    if user_id not in db["users"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return db["users"][user_id]
 
 
-########################################
-# Posts
-########################################
-@app.post("/posts", response_model=Post)
-def create_post(post_data: PostCreate, author_id: str):
-    # Check if author exists
-    author = get_user_by_id(author_id)
-    if not author:
-        raise HTTPException(status_code=404, detail="Author not found")
+# Post endpoints
+@app.post("/users/{user_id}/posts/", response_model=Post)
+async def create_post(
+    user_id: UUID, post: PostCreate, current_user: UserBase = Depends(get_current_user)
+):
+    post_id = uuid4()
+    current_time = datetime.now(timezone.utc)
 
-    new_id = uuid4()
-    now = datetime.utcnow()
-    post_dict = {
-        "id": new_id,
-        "title": post_data.title,
-        "content": post_data.content,
-        "created_at": now,
+    new_post = {
+        "id": post_id,
+        "title": post.title,
+        "content": post.content,
+        "created_at": current_time,
         "updated_at": None,
-        "published": post_data.published,
-        "author_id": author["id"],
-        "author": author,
+        "published": post.published,
+        "author_id": user_id,
+        "author": db["users"][user_id],
         "comments": [],
     }
 
-    # Add post to database
-    fake_posts_db[str(new_id)] = post_dict
+    db["posts"][post_id] = new_post
+    db["users"][user_id]["posts"].append(new_post)
+    return new_post
 
-    # Add the post reference to the user
-    author["posts"].append(post_dict)
-    return post_dict
+
+################ Posts Endpoints ################
+@app.get("/posts/", response_model=List[Post])
+async def get_posts():
+    return list(db["posts"].values())
 
 
 @app.get("/posts/{post_id}", response_model=Post)
-def get_post(post_id: str):
-    post = get_post_by_id(post_id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    return post
+async def get_post(post_id: UUID):
+    if post_id not in db["posts"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    return db["posts"][post_id]
 
 
-@app.get("/posts", response_model=List[Post])
-def list_posts():
-    return list(fake_posts_db.values())
+################ Comments Endpoints ################
+@app.post("/posts/{post_id}/comments/", response_model=Comment)
+async def create_comment(
+    post_id: UUID, comment: CommentCreate, current_user: UserBase = Depends(get_current_user)
+):
+    if post_id not in db["posts"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
+    comment_id = uuid4()
+    current_time = datetime.now(timezone.utc)
 
-########################################
-# Comments
-########################################
-@app.post("/posts/{post_id}/comments", response_model=Comment)
-def create_comment(post_id: str, comment_data: CommentCreate, author_id: str):
-    # Check if post exists
-    post = get_post_by_id(post_id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    # Check if author exists
-    author = get_user_by_id(author_id)
-    if not author:
-        raise HTTPException(status_code=404, detail="Author not found")
-
-    new_id = uuid4()
-    now = datetime.utcnow()
-    comment_dict = {
-        "id": new_id,
-        "content": comment_data.content,
-        "created_at": now,
+    new_comment = {
+        "id": comment_id,
+        "content": comment.content,
+        "created_at": current_time,
         "updated_at": None,
-        "author_id": author["id"],
-        "post_id": post["id"],
-        "author": author,
+        "author_id": current_user["id"],
+        "post_id": post_id,
+        "author": current_user,
     }
 
-    # Add comment to database and to the post
-    fake_comments_db[str(new_id)] = comment_dict
-    post["comments"].append(comment_dict)
-    # Add comment to user's comments
-    author["comments"].append(comment_dict)
-
-    return comment_dict
+    db["comments"][comment_id] = new_comment
+    db["posts"][post_id]["comments"].append(new_comment)
+    db["users"][current_user["id"]]["comments"].append(new_comment)
+    return new_comment
 
 
-@app.get("/comments/{comment_id}", response_model=Comment)
-def get_comment(comment_id: str):
-    comment = get_comment_by_id(comment_id)
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    return comment
+@app.get("/posts/{post_id}/comments/", response_model=List[Comment])
+async def get_post_comments(post_id: UUID):
+    if post_id not in db["posts"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    return db["posts"][post_id]["comments"]
 
 
-# ==================== MAIN ====================
+# Application Entry Point
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="debug", reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        log_level="debug",
+        reload=True,
+    )
