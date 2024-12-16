@@ -10,7 +10,8 @@ from pprint import pp, pprint
 # %%
 ############## Base models (for responses) ##############
 class UserBase(BaseModel):
-    # Setting from_attributes=True allows the model to populate fields from object attributes, which is useful when dealing with ORM models or other objects where data is accessed via attributes rather than dictionary keys.
+    # Setting from_attributes=True allows the model to populate fields from object attributes, which is useful when
+    # dealing with ORM models or other objects where data is accessed via attributes rather than dictionary keys.
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     username: str
@@ -25,7 +26,6 @@ class UserBase(BaseModel):
 # %%
 class PostBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: UUID
     title: str
     content: str
@@ -38,7 +38,6 @@ class PostBase(BaseModel):
 # %%
 class CommentBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: UUID
     content: str
     created_at: datetime
