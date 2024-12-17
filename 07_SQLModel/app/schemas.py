@@ -6,6 +6,20 @@ from uuid import UUID
 
 
 class UserBase(BaseModel):
+    """
+    Base model for a user.
+
+    Attributes:
+        id (UUID): The unique identifier of the user.
+        username (str): The username of the user.
+        email (EmailStr): The email address of the user.
+        full_name (str): The full name of the user.
+        bio (Optional[str]): A short biography of the user, if provided.
+        created_at (datetime): The timestamp when the user was created.
+        updated_at (Optional[datetime]): The timestamp when the user was last updated, if applicable.
+        is_active (bool): Indicates whether the user account is active.
+    """
+
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     username: str
@@ -70,7 +84,6 @@ class User(UserBase):
     comments: List[Comment] = []
 
 
-# Add this to schemas.py
 class UserUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     email: Optional[EmailStr] = None
