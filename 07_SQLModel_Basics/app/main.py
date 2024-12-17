@@ -1,60 +1,34 @@
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
-from sqlmodel import Field, Session, SQLModel, create_engine, select
-
-
-class Hero(SQLModel, table=True):
-    __table_args__ = {"extend_existing": True}
-
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    secret_name: str
-    age: int | None = Field(default=None, index=True)
-
-
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)
-
-
-# Create the database and tables
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine, checkfirst=True)
-
-
-# Lifespan context manager
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup event: Create the database and tables
-    create_db_and_tables()
-    yield
-    # Shutdown event: Add any cleanup logic here if needed
-
+from fastapi import FastAPI, Depends, HTTPException
+from sqlmodel import Session, select
+from db import create_db_and_tables, get_session
+from models import Hero, HeroCreate, HeroRead
 
 app = FastAPI()
 
 
-@app.post("/heroes/")
-def create_hero(hero: Hero):
-    with Session(engine) as session:
-        session.add(hero)
-        session.commit()
-        session.refresh(hero)
-        return hero
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
 
 
-@app.get("/heroes/")
-def read_heroes():
-    with Session(engine) as session:
-        heroes = session.exec(select(Hero)).all()
-        return heroes
+@app.post("/heroes/", response_model=HeroRead)
+def create_hero(hero: HeroCreate, session: Session = Depends(get_session)):
+    db_hero = Hero.model_validate(hero)
+    session.add(db_hero)
+    session.commit()
+    session.refresh(db_hero)
+    return db_hero
 
 
-if __name__ == "__main__":
-    import uvicorn
+@app.get("/heroes/", response_model=list[HeroRead])
+def read_heroes(session: Session = Depends(get_session)):
+    heroes = session.exec(select(Hero)).all()
+    return heroes
 
-    # Run the FastAPI application with reload enabled
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+@app.get("/heroes/{hero_id}", response_model=HeroRead)
+def read_hero(hero_id: int, session: Session = Depends(get_session)):
+    hero = session.get(Hero, hero_id)
+    if not hero:
+        raise HTTPException(status_code=404, detail="Hero not found")
+    return hero

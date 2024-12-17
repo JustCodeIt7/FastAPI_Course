@@ -1,54 +1,65 @@
-# models.py
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID, uuid4
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import Field, SQLModel, Relationship
 
 
-class UserModel(SQLModel, table=True):
-    __tablename__ = "users"
-
+# User model
+class User(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    username: str = Field(unique=True, index=True)
-    email: str = Field(unique=True, index=True)
+    username: str
+    email: str
     full_name: str
     bio: Optional[str] = None
-    hashed_password: str  # Changed from password to hashed_password
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    is_active: bool = Field(default=True)
+    updated_at: Optional[datetime] = None
+    is_active: bool = True
 
-    # Relationships
-    posts: List["PostModel"] = Relationship(back_populates="author")
-    comments: List["CommentModel"] = Relationship(back_populates="author")
+    posts: List["Post"] = Relationship(back_populates="author")
+    comments: List["Comment"] = Relationship(back_populates="author")
 
 
-class PostModel(SQLModel, table=True):
-    __tablename__ = "posts"
-
+# Post model
+class Post(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     title: str
     content: str
-    published: bool = Field(default=True)  # Add this line
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    author_id: UUID = Field(foreign_key="users.id")
+    updated_at: Optional[datetime] = None
+    published: bool = False
+    author_id: UUID = Field(foreign_key="user.id")
 
-    # Relationships
-    author: UserModel = Relationship(back_populates="posts")
-    comments: List["CommentModel"] = Relationship(back_populates="post")
+    author: User = Relationship(back_populates="posts")
+    comments: List["Comment"] = Relationship(back_populates="post")
 
 
-class CommentModel(SQLModel, table=True):
-    __tablename__ = "comments"
-
+# Comment model
+class Comment(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    author_id: UUID = Field(foreign_key="users.id")
-    post_id: UUID = Field(foreign_key="posts.id")
+    updated_at: Optional[datetime] = None
+    author_id: UUID = Field(foreign_key="user.id")
+    post_id: UUID = Field(foreign_key="post.id")
 
-    # Relationships
-    author: UserModel = Relationship(back_populates="comments")
-    post: PostModel = Relationship(back_populates="comments")
+    author: User = Relationship(back_populates="comments")
+    post: Post = Relationship(back_populates="comments")
+
+
+# Input validation models
+class UserCreate(SQLModel):
+    username: str
+    email: str
+    full_name: str
+    bio: Optional[str] = None
+    password: str  # Add password for user creation
+
+
+class PostCreate(SQLModel):
+    title: str
+    content: str
+    published: bool = False
+
+
+class CommentCreate(SQLModel):
+    content: str
