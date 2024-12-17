@@ -1,9 +1,9 @@
 # main.py
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from contextlib import asynccontextmanager
-from sqlmodel import Session
+from sqlmodel import Session, select
 from typing import List
-from uuid import UUID  # Added missing UUID import
+from uuid import UUID
 import uvicorn
 from datetime import datetime
 
@@ -12,33 +12,39 @@ from models import UserModel, PostModel, CommentModel
 from schemas import (
     UserCreate,
     UserBase,
+    UserUpdate,  # Add this to schemas.py
     PostCreate,
-    PostBase,
     CommentCreate,
-    CommentBase,
     User,
     Post,
     Comment,
 )
 
 
-# Define lifespan context manager (replacing @app.on_event)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     init_db()
     yield
-    # Shutdown
-    pass
 
 
-# Create FastAPI app with lifespan
 app = FastAPI(title="Blog API", lifespan=lifespan)
 
 
 # User endpoints
-@app.post("/users/", response_model=UserBase)
+@app.post("/users/", response_model=UserBase, status_code=status.HTTP_201_CREATED)
 def create_user(user: UserCreate, session: Session = Depends(get_session)):
+    # Check if username or email already exists
+    existing_user = session.exec(
+        select(UserModel).where(
+            (UserModel.username == user.username) | (UserModel.email == user.email)
+        )
+    ).first()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username or email already registered"
+        )
+
     db_user = UserModel(
         username=user.username,
         email=user.email,
@@ -54,13 +60,41 @@ def create_user(user: UserCreate, session: Session = Depends(get_session)):
 
 @app.get("/users/", response_model=List[User])
 def read_users(skip: int = 0, limit: int = 100, session: Session = Depends(get_session)):
-    users = session.query(UserModel).offset(skip).limit(limit).all()
+    users = session.exec(select(UserModel).offset(skip).limit(limit)).all()
     return users
 
 
+@app.put("/users/{user_id}", response_model=User)
+def update_user(user_id: UUID, user_update: UserUpdate, session: Session = Depends(get_session)):
+    db_user = session.get(UserModel, user_id)
+    if not db_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user_data = user_update.model_dump(exclude_unset=True)
+
+    # Update password if provided
+    if "password" in user_data:
+        user_data["hashed_password"] = user_data.pop("password").get_secret_value()
+        # In production, properly hash the password here
+
+    for key, value in user_data.items():
+        setattr(db_user, key, value)
+
+    db_user.updated_at = datetime.utcnow()
+    session.add(db_user)
+    session.commit()
+    session.refresh(db_user)
+    return db_user
+
+
 # Post endpoints
-@app.post("/posts/", response_model=Post)
+@app.post("/posts/", response_model=Post, status_code=status.HTTP_201_CREATED)
 def create_post(post: PostCreate, user_id: UUID, session: Session = Depends(get_session)):
+    # Verify user exists
+    user = session.get(UserModel, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
     db_post = PostModel(**post.model_dump(), author_id=user_id)
     session.add(db_post)
     session.commit()
@@ -70,20 +104,52 @@ def create_post(post: PostCreate, user_id: UUID, session: Session = Depends(get_
 
 @app.get("/posts/", response_model=List[Post])
 def read_posts(skip: int = 0, limit: int = 100, session: Session = Depends(get_session)):
-    posts = session.query(PostModel).offset(skip).limit(limit).all()
+    posts = session.exec(select(PostModel).offset(skip).limit(limit)).all()
     return posts
 
 
+@app.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(post_id: UUID, session: Session = Depends(get_session)):
+    db_post = session.get(PostModel, post_id)
+    if not db_post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    session.delete(db_post)
+    session.commit()
+    return None
+
+
 # Comment endpoints
-@app.post("/posts/{post_id}/comments/", response_model=Comment)
+@app.post("/posts/{post_id}/comments/", response_model=Comment, status_code=status.HTTP_201_CREATED)
 def create_comment(
     post_id: UUID, comment: CommentCreate, user_id: UUID, session: Session = Depends(get_session)
 ):
+    # Verify post exists
+    post = session.get(PostModel, post_id)
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    # Verify user exists
+    user = session.get(UserModel, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
     db_comment = CommentModel(**comment.model_dump(), author_id=user_id, post_id=post_id)
     session.add(db_comment)
     session.commit()
     session.refresh(db_comment)
     return db_comment
+
+
+@app.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_comment(comment_id: UUID, session: Session = Depends(get_session)):
+    db_comment = session.get(CommentModel, comment_id)
+    if not db_comment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+
+    session.delete(db_comment)
+    session.commit()
+    return None
 
 
 if __name__ == "__main__":

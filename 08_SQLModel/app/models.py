@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import List, Optional
 from sqlmodel import SQLModel, Field, Relationship
-from pydantic import EmailStr, SecretStr
+from pydantic import EmailStr
 from uuid import UUID, uuid4
 
 

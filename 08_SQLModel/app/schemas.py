@@ -68,3 +68,12 @@ class Post(PostBase):
 class User(UserBase):
     posts: List[Post] = []
     comments: List[Comment] = []
+
+
+# Add this to schemas.py
+class UserUpdate(BaseModel):
+    username: Optional[str] = Field(None, min_length=3, max_length=50)
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    bio: Optional[str] = Field(None, max_length=500)
+    password: Optional[SecretStr] = None
