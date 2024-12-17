@@ -1,8 +1,13 @@
 # database.py
 from sqlmodel import create_engine, Session, SQLModel
+import os
 
-DATABASE_URL = "sqlite:///../../../blog.db"
+# Delete the existing database file if it exists
+DATABASE_PATH = "../../../blog.db"
+if os.path.exists(DATABASE_PATH):
+    os.remove(DATABASE_PATH)
 
+DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 engine = create_engine(DATABASE_URL, echo=True)
 
 
