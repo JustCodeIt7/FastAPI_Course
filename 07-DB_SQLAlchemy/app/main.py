@@ -1,240 +1,142 @@
 # main.py
-from fastapi import FastAPI, Depends, HTTPException, status, Response
-from sqlalchemy import (
-    create_engine,
-    Column,
-    Integer,
-    String,
-    Text,
-    DateTime,
-    Enum as SQLAlchemyEnum,
-)
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from pydantic import BaseModel, Field
+from fastapi import FastAPI, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from typing import List
 from datetime import datetime
-from typing import List, Optional, Dict
-from enum import Enum
+from contextlib import asynccontextmanager
 
-# Database Setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./blog.db"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-
-# Enums
-class PostStatus(str, Enum):
-    DRAFT = "draft"
-    PUBLISHED = "published"
-    ARCHIVED = "archived"
-
-
-# Database Model
-class BlogPost(Base):
-    __tablename__ = "posts"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(100), unique=True, nullable=False)
-    content = Column(Text, nullable=False)
-    author = Column(String(50), nullable=False)
-    status = Column(SQLAlchemyEnum(PostStatus), default=PostStatus.DRAFT)
-    views = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+import models
+import schemas
+from database import engine, get_db
 
 
 # Create tables
-Base.metadata.create_all(bind=engine)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    models.Base.metadata.create_all(bind=engine)
+    yield
 
 
-# Custom Exceptions
-class PostNotFoundException(HTTPException):
-    def __init__(self):
-        super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+app = FastAPI(lifespan=lifespan)
 
 
-class PostTitleExistsException(HTTPException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A post with this title already exists",
+# User endpoints
+@app.post("/users/", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # Check if username or email already exists
+    existing_user = (
+        db.query(models.User)
+        .filter(or_(models.User.username == user.username, models.User.email == user.email))
+        .first()
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username or email already registered"
         )
 
-
-class InvalidStatusTransitionException(HTTPException):
-    def __init__(self, current_status: str, new_status: str):
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot transition from {current_status} to {new_status}",
-        )
-
-
-# Pydantic Models
-class PostBase(BaseModel):
-    title: str = Field(..., min_length=5, max_length=100)
-    content: str = Field(..., min_length=50)
-    author: str = Field(..., min_length=2, max_length=50)
-    status: PostStatus = PostStatus.DRAFT
+    db_user = models.User(
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+        bio=user.bio,
+        hashed_password=user.password.get_secret_value(),  # In production, hash the password
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
 
 
-class PostCreate(PostBase):
-    pass
+@app.get("/users/", response_model=List[schemas.UserResponse])
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    users = db.query(models.User).offset(skip).limit(limit).all()
+    return users
 
 
-class PostUpdate(BaseModel):
-    title: Optional[str] = Field(None, min_length=5, max_length=100)
-    content: Optional[str] = Field(None, min_length=50)
-    status: Optional[PostStatus] = None
+@app.put("/users/{user_id}", response_model=schemas.UserResponse)
+def update_user(user_id: str, user_update: schemas.UserUpdate, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_data = user_update.model_dump(exclude_unset=True)
+    if "password" in user_data:
+        user_data["hashed_password"] = user_data.pop("password").get_secret_value()
+        # In production, hash the password here
+
+    for key, value in user_data.items():
+        setattr(db_user, key, value)
+
+    db_user.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(db_user)
+    return db_user
 
 
-class Post(PostBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    views: int
+# Post endpoints
+@app.post("/posts/", response_model=schemas.PostResponse, status_code=status.HTTP_201_CREATED)
+def create_post(post: schemas.PostCreate, user_id: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-    class Config:
-        from_attributes = True
-
-
-# FastAPI App
-p06_app = FastAPI(title="Blog API with SQLAlchemy and Error Handling")
-
-
-# root route
-@p06_app.get("/")
-async def read_root():
-    return {"message": "Welcome to the Blog API"}
-
-
-# Database Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# Helper functions
-def get_post_or_404(db: Session, post_id: int) -> BlogPost:
-    post = db.query(BlogPost).filter(BlogPost.id == post_id).first()
-    if post is None:
-        raise PostNotFoundException()
-    return post
-
-
-def check_title_exists(
-    db: Session, title: str, exclude_id: Optional[int] = None
-) -> bool:
-    query = db.query(BlogPost).filter(BlogPost.title.ilike(title))
-    if exclude_id:
-        query = query.filter(BlogPost.id != exclude_id)
-    return query.first() is not None
-
-
-# API Endpoints
-@p06_app.post(
-    "/posts/",
-    response_model=Post,
-    status_code=status.HTTP_201_CREATED,
-    responses={400: {"description": "Post with this title already exists"}},
-)
-async def create_post(post: PostCreate, db: Session = Depends(get_db)):
-    """Create a new blog post"""
-    if check_title_exists(db, post.title):
-        raise PostTitleExistsException()
-
-    db_post = BlogPost(**post.dict())
+    db_post = models.Post(**post.model_dump(), author_id=user_id)
     db.add(db_post)
     db.commit()
     db.refresh(db_post)
     return db_post
 
 
-@p06_app.get(
-    "/posts/",
-    response_model=List[Post],
-    responses={204: {"description": "No posts found"}},
-)
-async def list_posts(
-    skip: int = 0,
-    limit: int = 10,
-    status: Optional[PostStatus] = None,
-    db: Session = Depends(get_db),
-):
-    """List all posts with optional filtering and pagination"""
-    query = db.query(BlogPost)
-
-    if status:
-        query = query.filter(BlogPost.status == status)
-
-    posts = query.offset(skip).limit(limit).all()
-
-    if not posts:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
+@app.get("/posts/", response_model=List[schemas.PostResponse])
+def read_posts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    posts = db.query(models.Post).offset(skip).limit(limit).all()
     return posts
 
 
-@p06_app.get(
-    "/posts/{post_id}",
-    response_model=Post,
-    responses={404: {"description": "Post not found"}},
-)
-async def get_post(post_id: int, db: Session = Depends(get_db)):
-    """Get a specific post by ID"""
-    post = get_post_or_404(db, post_id)
-    post.views += 1
-    db.commit()
-    return post
+@app.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(post_id: str, db: Session = Depends(get_db)):
+    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
 
-
-@p06_app.patch(
-    "/posts/{post_id}",
-    response_model=Post,
-    responses={
-        404: {"description": "Post not found"},
-        400: {"description": "Invalid status transition or title already exists"},
-    },
-)
-async def update_post(
-    post_id: int, post_update: PostUpdate, db: Session = Depends(get_db)
-):
-    """Update a post"""
-    post = get_post_or_404(db, post_id)
-
-    if post_update.title and check_title_exists(db, post_update.title, post_id):
-        raise PostTitleExistsException()
-
-    if post_update.status:
-        if (
-            post.status == PostStatus.ARCHIVED
-            and post_update.status != PostStatus.ARCHIVED
-        ):
-            raise InvalidStatusTransitionException(post.status, post_update.status)
-
-    update_data = post_update.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(post, key, value)
-
-    db.commit()
-    db.refresh(post)
-    return post
-
-
-@p06_app.delete(
-    "/posts/{post_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    responses={404: {"description": "Post not found"}},
-)
-async def delete_post(post_id: int, db: Session = Depends(get_db)):
-    """Delete a post"""
-    post = get_post_or_404(db, post_id)
     db.delete(post)
+    db.commit()
+    return None
+
+
+# Comment endpoints
+@app.post(
+    "/posts/{post_id}/comments/",
+    response_model=schemas.CommentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_comment(
+    post_id: str, comment: schemas.CommentCreate, user_id: str, db: Session = Depends(get_db)
+):
+    post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_comment = models.Comment(**comment.model_dump(), author_id=user_id, post_id=post_id)
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    return db_comment
+
+
+@app.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_comment(comment_id: str, db: Session = Depends(get_db)):
+    comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    db.delete(comment)
     db.commit()
     return None
 
@@ -242,6 +144,4 @@ async def delete_post(post_id: int, db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(
-        "main:p06_app", host="0.0.0.0", port=8000, log_level="debug", reload=True
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
