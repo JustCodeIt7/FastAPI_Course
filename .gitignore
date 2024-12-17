@@ -175,7 +175,7 @@ cython_debug/
 
 *dev.md
 /06-DB_SQLAlchemy/app/blog.db
-!/04-Pydantic/README-dev.md
-!/04-Pydantic/app/Pydantic_Guide_Summary-dev.ipynb
+!/04-Pydantic_Basics/README-dev.md
+!/04-Pydantic_Basics/app/Pydantic_Guide_Summary-dev.ipynb
 
-04-Pydantic/Pydantic_Basics-dev.ipynb
+04-Pydantic_Basics/Pydantic_Basics-dev.ipynb
