@@ -1,79 +1,90 @@
-from typing import Annotated
+# main.py
+from fastapi import FastAPI, Depends, HTTPException
+from contextlib import asynccontextmanager
+from sqlmodel import Session
+from typing import List
+from uuid import UUID  # Added missing UUID import
+import uvicorn
+from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, Query
-from sqlmodel import Field, Session, SQLModel, create_engine, select
-
-
-class Hero(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    age: int | None = Field(default=None, index=True)
-    secret_name: str
-
-
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, connect_args=connect_args)
-
-
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
+from database import get_session, init_db
+from models import UserModel, PostModel, CommentModel
+from schemas import (
+    UserCreate,
+    UserBase,
+    PostCreate,
+    PostBase,
+    CommentCreate,
+    CommentBase,
+    User,
+    Post,
+    Comment,
+)
 
 
-SessionDep = Annotated[Session, Depends(get_session)]
+# Define lifespan context manager (replacing @app.on_event)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    yield
+    # Shutdown
+    pass
 
-app = FastAPI()
+
+# Create FastAPI app with lifespan
+app = FastAPI(title="Blog API", lifespan=lifespan)
 
 
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
-
-
-@app.post("/heroes/")
-def create_hero(hero: Hero, session: SessionDep) -> Hero:
-    session.add(hero)
+# User endpoints
+@app.post("/users/", response_model=UserBase)
+def create_user(user: UserCreate, session: Session = Depends(get_session)):
+    db_user = UserModel(
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+        bio=user.bio,
+        hashed_password=user.password.get_secret_value(),  # In production, use proper password hashing
+    )
+    session.add(db_user)
     session.commit()
-    session.refresh(hero)
-    return hero
+    session.refresh(db_user)
+    return db_user
 
 
-@app.get("/heroes/")
-def read_heroes(
-    session: SessionDep,
-    offset: int = 0,
-    limit: Annotated[int, Query(le=100)] = 100,
-) -> list[Hero]:
-    heroes = session.exec(select(Hero).offset(offset).limit(limit)).all()
-    return heroes
+@app.get("/users/", response_model=List[User])
+def read_users(skip: int = 0, limit: int = 100, session: Session = Depends(get_session)):
+    users = session.query(UserModel).offset(skip).limit(limit).all()
+    return users
 
 
-@app.get("/heroes/{hero_id}")
-def read_hero(hero_id: int, session: SessionDep) -> Hero:
-    hero = session.get(Hero, hero_id)
-    if not hero:
-        raise HTTPException(status_code=404, detail="Hero not found")
-    return hero
-
-
-@app.delete("/heroes/{hero_id}")
-def delete_hero(hero_id: int, session: SessionDep):
-    hero = session.get(Hero, hero_id)
-    if not hero:
-        raise HTTPException(status_code=404, detail="Hero not found")
-    session.delete(hero)
+# Post endpoints
+@app.post("/posts/", response_model=Post)
+def create_post(post: PostCreate, user_id: UUID, session: Session = Depends(get_session)):
+    db_post = PostModel(**post.model_dump(), author_id=user_id)
+    session.add(db_post)
     session.commit()
-    return {"ok": True}
+    session.refresh(db_post)
+    return db_post
 
-# ==================== MAIN ====================
+
+@app.get("/posts/", response_model=List[Post])
+def read_posts(skip: int = 0, limit: int = 100, session: Session = Depends(get_session)):
+    posts = session.query(PostModel).offset(skip).limit(limit).all()
+    return posts
+
+
+# Comment endpoints
+@app.post("/posts/{post_id}/comments/", response_model=Comment)
+def create_comment(
+    post_id: UUID, comment: CommentCreate, user_id: UUID, session: Session = Depends(get_session)
+):
+    db_comment = CommentModel(**comment.model_dump(), author_id=user_id, post_id=post_id)
+    session.add(db_comment)
+    session.commit()
+    session.refresh(db_comment)
+    return db_comment
+
+
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="debug", reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
