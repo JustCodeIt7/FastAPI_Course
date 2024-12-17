@@ -1,0 +1,82 @@
+### Welcome Page
+GET http://localhost:8000/
+
+### 1. Create Users
+POST http://localhost:8000/users/
+Content-Type: application/json
+
+{
+  "username": "john_doe",
+  "email": "john@example.com",
+  "full_name": "John Doe",
+  "bio": "Tech enthusiast and software developer",
+  "password": "securepass123"
+}
+
+### Create another user
+POST http://localhost:8000/users/
+Content-Type: application/json
+
+{
+  "username": "jane_smith",
+  "email": "jane@example.com",
+  "full_name": "Jane Smith",
+  "bio": "Digital content creator",
+  "password": "password456"
+}
+
+### 2. Get All Users
+GET localhost:8000/users/?skip=0&limit=100
+
+
+### 3. Create a Blog Post (Replace USER_ID with actual UUID from previous response)
+POST http://localhost:8000/posts/
+Content-Type: application/json
+
+{
+  "title": "Getting Started with FastAPI",
+  "content": "FastAPI is an amazing modern framework for building APIs with Python. In this post, we'll explore its key features..."
+}
+?user_id=USER_ID
+
+### Create another post
+POST http://localhost:8000/posts/
+Content-Type: application/json
+
+{
+  "title": "Python Best Practices",
+  "content": "Let's dive into some Python best practices that will make your code more maintainable and efficient..."
+}
+?user_id=USER_ID
+
+### 4. Get All Posts
+GET http://localhost:8000/posts/
+
+### 5. Add a Comment to a Post (Replace POST_ID and USER_ID with actual UUIDs)
+POST http://localhost:8000/posts/POST_ID/comments/
+Content-Type: application/json
+
+{
+  "content": "Great article! Really helped me understand FastAPI better."
+}
+?user_id=USER_ID
+
+### Add another comment
+POST http://localhost:8000/posts/POST_ID/comments/
+Content-Type: application/json
+
+{
+  "content": "Would love to see a follow-up post on advanced FastAPI features!"
+}
+?user_id=USER_ID
+
+### 6. Update User Profile (Replace USER_ID with actual UUID)
+PUT http://localhost:8000/users/USER_ID
+Content-Type: application/json
+
+{
+  "bio": "Updated bio: Tech enthusiast, software developer, and FastAPI advocate"
+}
+
+### 7. Delete a Post (Replace POST_ID with actual UUID)
+DELETE http://localhost:8000/posts/POST_ID

@@ -29,6 +29,7 @@ class PostModel(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     title: str
     content: str
+    published: bool = Field(default=True)  # Add this line
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     author_id: UUID = Field(foreign_key="users.id")
