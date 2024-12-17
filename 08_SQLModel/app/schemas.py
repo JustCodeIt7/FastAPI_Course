@@ -1,12 +1,12 @@
 # schemas.py
-from typing import List, Optional
-from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field, SecretStr
 from datetime import datetime
+from typing import List, Optional
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, SecretStr
+from uuid import UUID
 
 
-# Base Models (Responses)
 class UserBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: UUID
     username: str
     email: EmailStr
@@ -16,23 +16,9 @@ class UserBase(BaseModel):
     updated_at: Optional[datetime]
     is_active: bool
 
-    class Config:
-        orm_mode = True
-
-
-class CommentBase(BaseModel):
-    id: UUID
-    content: str
-    created_at: datetime
-    updated_at: Optional[datetime]
-    author_id: UUID
-    post_id: UUID
-
-    class Config:
-        orm_mode = True
-
 
 class PostBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: UUID
     title: str
     content: str
@@ -41,11 +27,17 @@ class PostBase(BaseModel):
     published: bool
     author_id: UUID
 
-    class Config:
-        orm_mode = True
+
+class CommentBase(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    content: str
+    created_at: datetime
+    updated_at: Optional[datetime]
+    author_id: UUID
+    post_id: UUID
 
 
-# Request Models
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
@@ -64,25 +56,15 @@ class CommentCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=1000)
 
 
-# Response Models with Relationships
 class Comment(CommentBase):
     author: UserBase
-
-    class Config:
-        orm_mode = True
 
 
 class Post(PostBase):
     author: UserBase
     comments: List[Comment] = []
 
-    class Config:
-        orm_mode = True
-
 
 class User(UserBase):
     posts: List[Post] = []
     comments: List[Comment] = []
-
-    class Config:
-        orm_mode = True
