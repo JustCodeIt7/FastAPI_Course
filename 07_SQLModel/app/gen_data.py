@@ -135,7 +135,7 @@ class BlogDataGenerator:
 
 def main():
     generator = BlogDataGenerator()
-    generator.generate_all(num_users=5, posts_per_user=3, comments_per_post=2)
+    generator.generate_all(num_users=3, posts_per_user=3, comments_per_post=2)
 
 
 if __name__ == "__main__":
