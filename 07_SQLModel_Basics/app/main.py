@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel import Session, select
 from db import create_db_and_tables, get_session
 from models import Hero, HeroCreate, HeroRead
+from rich import print
 
 app = FastAPI()
 
