@@ -7,7 +7,19 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi[standard]>=0.115.6",
     "pandas>=2.2.3",
+    "prefect>=3.1.7",
     "sqlalchemy>=2.0.36",
     "sqlmodel>=0.0.22",
     "uvicorn>=0.34.0",
 ]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "tab"
+docstring-code-format = true
+
+#[tool.uv.workspace]
+#members = ["07_SQLModel_Basics/app", "08_SQLMod d

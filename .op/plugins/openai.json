@@ -1,0 +1,15 @@
+{
+	"account_id": "DRIGCPLKJBAUDBRTKZZUMTW3ZI",
+	"entrypoint": [
+		"openai"
+	],
+	"credentials": [
+		{
+			"plugin": "openai",
+			"credential_type": "api_key",
+			"usage_id": "api_key",
+			"vault_id": "5k6bykry7pwmrugltp2rz4cn5u",
+			"item_id": "xszf6yet3iisifmcmjvka2povq"
+		}
+	]
+}

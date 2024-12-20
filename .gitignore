@@ -179,3 +179,4 @@ cython_debug/
 !/04-Pydantic_Basics/app/Pydantic_Guide_Summary-dev.ipynb
 
 04-Pydantic_Basics/Pydantic_Basics-dev.ipynb
+.aider*
