@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from rich import print
 
+
 # %%
 # Define the database URL
 DATABASE_URL = "sqlite:///tutorial.db"
@@ -21,20 +22,19 @@ class Hero(SQLModel, table=True):
     secret_name: str
     age: Optional[int] = None
 
-
 # %%
+print("################## Resetting database and tables ##################")
 # Drop and create the database and tables
 def reset_db_and_tables():
     SQLModel.metadata.drop_all(engine)  # Drop all tables if they exist
     SQLModel.metadata.create_all(engine)  # Create tables
 
-
-# %%
-print("################## Resetting database and tables ##################")
 reset_db_and_tables()
 
 
+
 # %%
+print("\n################## Adding heroes to the database ############\n")
 # Add a hero to the database
 def create_hero(name: str, secret_name: str, age: Optional[int] = None):
     with Session(engine) as session:
@@ -44,33 +44,28 @@ def create_hero(name: str, secret_name: str, age: Optional[int] = None):
         session.refresh(hero)
         print(f"Created hero: {hero}")
 
-
-# %%
-print("\n################## Adding heroes to the database ##################\n")
-# Create some heroes
 create_hero(name="Deadpond", secret_name="Dive Wilson", age=30)
 create_hero(name="Spider-Boy", secret_name="Pedro Parqueador", age=18)
-create_hero(name="Rusty-Man", secret_name="Tommy Sharp", age=48)
+create_hero(name="Iron Man", secret_name="The Goat", age=48)
 
 
 # %%
-# Get all heroes from the database
+print("\n############ Getting all heroes from the database ##########\n")
+
 def get_heroes():
     with Session(engine) as session:
         heroes = session.exec(select(Hero)).all()
         print("Heroes in the database:")
         for hero in heroes:
             print(hero)
-
-
+            
 # %%
-print("\n################## Getting all heroes from the database ##################\n")
 # Get all heroes
 get_heroes()
 
 
 # %%
-# Update a hero's age
+print("\n################## Updating a hero's age ##################\n")
 def update_hero_age(hero_id: UUID, new_age: int):
     with Session(engine) as session:
         hero = session.get(Hero, hero_id)
@@ -83,20 +78,16 @@ def update_hero_age(hero_id: UUID, new_age: int):
         session.refresh(hero)
         print(f"Updated hero: {hero}")
 
-
 # %%
-print("\n################## Updating a hero's age ##################\n")
 # Update a hero's age
-hero_id_to_update = input("Enter the ID of the hero to update: ")
-new_age = int(input("Enter the new age: "))
+hero_id_to_update = '9fa95e46-a8a9-4f2f-a31a-ad5750ba7138'
+new_age = 50
 update_hero_age(UUID(hero_id_to_update), new_age)
 
 # Get all heroes again
 get_heroes()
-
-
 # %%
-# Delete a hero
+print("\n################## Deleting a hero ##################\n")
 def delete_hero(hero_id: UUID):
     with Session(engine) as session:
         hero = session.get(Hero, hero_id)
@@ -107,11 +98,9 @@ def delete_hero(hero_id: UUID):
         session.commit()
         print(f"Deleted hero with ID: {hero_id}")
 
-
 # %%
-print("\n################## Deleting a hero ##################\n")
 # Delete a hero
-hero_id_to_delete = input("Enter the ID of the hero to delete: ")
+hero_id_to_delete = "8a348c64-d239-4574-b8f6-19a754aac00d"
 delete_hero(UUID(hero_id_to_delete))
 
 # Get all heroes again
