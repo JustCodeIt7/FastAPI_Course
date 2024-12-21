@@ -22,3 +22,7 @@ blog_app/
     - Foreign keys explicitly store the reference in the database to the related record.
     - For example, in the `Post` model, the `author_id` field is a foreign key (`Field(foreign_key="user.id")`) linking
       a specific post to a user
+
+## UML Diagram
+
+<img src="sql_model_uml_with_relationships.png" alt="sql_model_uml_diagram" width="530"/>
