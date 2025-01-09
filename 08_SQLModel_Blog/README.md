@@ -5,7 +5,6 @@ blog_app/
 ├── main.py
 ├── models.py
 ├── database.py
-├── schemas.py
 ```
 
 1. **Model Association**:

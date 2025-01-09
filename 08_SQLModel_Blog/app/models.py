@@ -79,6 +79,7 @@ class CommentCreate(SQLModel):
 
 
 if __name__ == "__main__":
+
     from sqlmodel import create_engine
     from database import create_db_and_tables
     from sqlmodel import Session

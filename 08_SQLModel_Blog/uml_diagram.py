@@ -1,10 +1,7 @@
 from graphviz import Digraph
 
-
 # Update the diagram with relationship details
 uml_diagram = Digraph("UML_Diagram_Relationships", format="png")
-# Define global styles for a dark theme
-
 
 # User model
 uml_diagram.node(
