@@ -1,0 +1,44 @@
+digraph UML_Diagram_Relationships {
+	User [label="{
+    User |
+    id: UUID |
+    username: str |
+    email: EmailStr |
+    full_name: str |
+    bio: Optional[str] |
+    created_at: datetime |
+    updated_at: Optional[datetime] |
+    is_active: bool |
+    posts: List[Post] |
+    comments: List[Comment]
+}"]
+	Post [label="{
+    Post |
+    id: UUID |
+    title: str |
+    content: str |
+    created_at: datetime |
+    updated_at: Optional[datetime] |
+    published: bool |
+    author_id: UUID |
+    author: User |
+    comments: List[Comment]
+}"]
+	Comment [label="{
+    Comment |
+    id: UUID |
+    content: str |
+    created_at: datetime |
+    updated_at: Optional[datetime] |
+    author_id: UUID |
+    post_id: UUID |
+    author: User |
+    post: Post
+}"]
+	User -> Post [label="1 to Many (posts)" dir=forward]
+	User -> Comment [label="1 to Many (comments)" dir=forward]
+	Post -> Comment [label="1 to Many (comments)" dir=forward]
+	Post -> User [label="Many to 1 (author)" dir=forward]
+	Comment -> User [label="Many to 1 (author)" dir=forward]
+	Comment -> Post [label="Many to 1 (post)" dir=forward]
+}

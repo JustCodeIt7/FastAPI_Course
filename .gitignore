@@ -181,3 +181,4 @@ cython_debug/
 04-Pydantic_Basics/Pydantic_Basics-dev.ipynb
 .aider*
 07_SQLModel_Basics/tutorial.db
+.DS_Store
