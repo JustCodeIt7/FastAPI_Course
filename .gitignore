@@ -182,3 +182,4 @@ cython_debug/
 .aider*
 07_SQLModel_Basics/tutorial.db
 .DS_Store
+.DS_Store
