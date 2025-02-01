@@ -1,0 +1,27 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+
+{% block content %}
+    <section class="post-form">
+        <h2>Create New Post</h2>
+        <form hx-post="/create_post" hx-target="this" hx-swap="outerHTML">
+            <input type="text" name="title" placeholder="Post Title" required>
+            <textarea name="content" placeholder="Post Content" required></textarea>
+            <input type="text" name="author" placeholder="Author Name">
+            <button type="submit">Create Post</button>
+        </form>
+    </section>
+
+    <section class="posts">
+        {% for post in posts %}
+        <article class="post">
+            <h3>{{ post.title }}</h3>
+            <p>{{ post.content }}</p>
+            <div class="post-meta">
+                <span>By {{ post.author }}</span>
+                <span>{{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            </div>
+        </article>
+        {% endfor %}
+    </section>
+{% endblock %}

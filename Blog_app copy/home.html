@@ -1,0 +1,67 @@
+{{% raw %}}
+<html>
+<head><title>Blog Home</title></head>
+<body>
+    <h1>Welcome to the Blog</h1>
+    <a href="/create">Create a New Post</a>
+    <ul>
+    {% for post in posts %}
+        <li>
+            <a href="/posts/{{ post.id }}">{{ post.title }}</a>
+            <form method="post" action="/posts/{{ post.id }}/delete" style="display:inline;">
+                <button type="submit">Delete</button>
+            </form>
+            <a href="/posts/{{ post.id }}/edit">Edit</a>
+        </li>
+    {% endfor %}
+    </ul>
+</body>
+</html>
+{{% endraw %}}
+
+Example: create_post.html
+{{% raw %}}
+<html>
+<head><title>Create Post</title></head>
+<body>
+    <h1>Create a New Post</h1>
+    <form method="post" action="/create">
+        <label for="title">Title:</label>
+        <input type="text" id="title" name="title" required><br><br>
+        <label for="content">Content:</label><br>
+        <textarea id="content" name="content" rows="5" cols="30" required></textarea><br><br>
+        <button type="submit">Create</button>
+    </form>
+</body>
+</html>
+{{% endraw %}}
+
+Example: view_post.html
+{{% raw %}}
+<html>
+<head><title>{{ post.title }}</title></head>
+<body>
+    <h1>{{ post.title }}</h1>
+    <p>{{ post.content }}</p>
+    <a href="/">Back to Home</a>
+</body>
+</html>
+{{% endraw %}}
+
+Example: edit_post.html
+{{% raw %}}
+<html>
+<head><title>Edit Post</title></head>
+<body>
+    <h1>Edit Post</h1>
+    <form method="post" action="/posts/{{ post.id }}/edit">
+        <label for="title">Title:</label>
+        <input type="text" id="title" name="title" value="{{ post.title }}" required><br><br>
+        <label for="content">Content:</label><br>
+        <textarea id="content" name="content" rows="5" cols="30" required>{{ post.content }}</textarea><br><br>
+        <button type="submit">Save</button>
+    </form>
+    <a href="/">Back to Home</a>
+</body>
+</html>
+{{% endraw %}}
