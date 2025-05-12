@@ -116,8 +116,8 @@ async def create_item(item: Item):
     """
     # The `item` parameter will be an instance of the `Item` model.
     # You can access its attributes directly:
-    # print(f"Received item name: {item.name}")
-    # print(f"Received item price: {item.price}")
+    print(f"Received item name: {item.name}")
+    print(f"Received item price: {item.price}")
 
     # For the response, we can simply return the received item.
     # FastAPI will automatically serialize this Pydantic model instance back into a JSON response.
