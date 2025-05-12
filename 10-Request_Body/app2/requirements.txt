@@ -1,0 +1,6 @@
+fastapi>=0.95.0,<0.97.0
+uvicorn>=0.20.0,<0.23.0
+pydantic>=1.10.0,<2.0.0
+httpx>=0.24.0,<0.26.0
+email-validator>=2.0.0
+python-multipart>=0.0.6
