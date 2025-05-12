@@ -1,10 +1,11 @@
 # main.py
-# main.py
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from datetime import datetime
 from enum import Enum
+
+from requests import Response
 
 p05_app = FastAPI(title="Blog API with Error Handling")
 
@@ -124,7 +125,7 @@ async def create_post(post: PostCreate):
     responses={204: {"description": "No posts found"}},
 )
 async def list_posts(
-    skip: int = 0, limit: int = 10, status: Optional[PostStatus] = None
+        skip: int = 0, limit: int = 10, status: Optional[PostStatus] = None
 ):
     """List all posts with optional filtering and pagination"""
     posts = list(posts_db.values())
@@ -135,7 +136,7 @@ async def list_posts(
     if not posts:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    return posts[skip : skip + limit]
+    return posts[skip: skip + limit]
 
 
 @p05_app.get(
@@ -168,8 +169,8 @@ async def update_post(post_id: int, post_update: PostUpdate):
     if post_update.status:
         current_status = PostStatus(post["status"])
         if (
-            current_status == PostStatus.ARCHIVED
-            and post_update.status != PostStatus.ARCHIVED
+                current_status == PostStatus.ARCHIVED
+                and post_update.status != PostStatus.ARCHIVED
         ):
             raise InvalidStatusTransitionException(current_status, post_update.status)
 
